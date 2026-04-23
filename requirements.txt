@@ -18,6 +18,13 @@ sentence-transformers==5.4.0
 requests==2.32.5
 beautifulsoup4==4.14.3
 selenium==4.42.0
+webdriver-manager==4.0.2
+
+# 立榮驗證碼辨識
+ddddocr==1.4.11
+opencv-python-headless==4.11.0.86
+numpy==1.26.4
+Pillow==11.2.1
 
 # 環境變數
 python-dotenv==1.0.0

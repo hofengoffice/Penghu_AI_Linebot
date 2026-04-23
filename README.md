@@ -1,20 +1,21 @@
 # 澎湖旅遊 AI LINE Bot
 
-澎湖在地旅遊助手，提供行程規劃、智慧查詢、航班查詢等旅遊服務。
+澎湖在地旅遊助手，提供行程規劃、智慧查詢、航班查詢、主題瀏覽、心願清單詢價等旅遊服務。
 
 ---
 
 ## 系統功能
 
-主選單提供五個功能入口：
-
 | 功能 | 說明 |
 |------|------|
-| 熱門行程 | 四種行程類型輪播卡片，點入可瀏覽詳細行程並收藏 |
-| 收藏清單 | 顯示個人收藏的行程，支援查看詳情與刪除 |
-| 智慧查詢 | 輸入需求，AI 結合 RAG 生成客製化澎湖行程建議 |
+| 熱門行程 | 行程類型輪播卡片，點入可瀏覽詳細行程並收藏 |
+| 行程主題 | 五種旅遊主題 carousel（親子 / 蜜月 / 文化 / 海島 / 背包客） |
+| 美食主題 | 五種美食主題 carousel（海鮮 / 小吃 / 名產 / 餐廳 / 仙人掌） |
+| 交通主題 | 五種交通主題 carousel（飛機 / 船班 / 租車 / 機車 / 自行車） |
+| 智慧查詢 | 輸入需求，AI 結合 RAG 生成客製化澎湖行程建議，可收藏 |
+| 收藏清單 | 顯示個人收藏（行程 / 交通 / 住宿），支援詳情、刪除、**確認詢價** |
 | 空房查詢 | 查詢澎湖飯店空房資訊 |
-| 交通查詢 | 查詢往返澎湖的航班時刻與島內交通資訊 |
+| 飛機航班 | 透過 LIFF 網頁填寫出發城市、日期、旅客人數，查詢華信與立榮航班 |
 
 ---
 
@@ -28,12 +29,15 @@ LINE User
     ▼
 LINE Platform
     │  Webhook (HTTPS POST / Postback)
+    │  LIFF (LINE Front-end Framework)
     ▼
-┌─────────────────────────────────────────┐
-│  app.py  ─  Flask Webhook 入口          │
-│  user_states{}  ─  對話狀態機           │
-└────────────────┬────────────────────────┘
-                 │ 依 step / postback 分派
+┌─────────────────────────────────────────────────┐
+│  app.py  ─  Flask Webhook 入口                  │
+│  user_states{}  ─  對話狀態機                   │
+│  /liff/flight    ─  LIFF 航班表單頁面            │
+│  /api/flight-search  ─  LIFF 查詢 API           │
+└────────────────┬────────────────────────────────┘
+                 │ 依 text / postback 分派
         ┌────────┴────────┐
         ▼                 ▼
   handlers/           flex/
@@ -42,39 +46,71 @@ LINE Platform
         ▼
   services/
   資料服務層
-  ┌─────────────────────────────┐
-  │ airline_service  → 華信航空  │
-  │ weather_service  → 氣象署API │
-  │ tide_service     → 澎管處   │
-  │ rag_service      → RAG引擎  │
-  └─────────────────────────────┘
+  ┌─────────────────────────────────┐
+  │ airline_service  → 華信 + 立榮  │
+  │ email_service    → SMTP 寄信    │
+  │ weather_service  → 氣象署 API   │
+  │ tide_service     → 澎管處爬蟲   │
+  │ rag_service      → RAG 引擎     │
+  └─────────────────────────────────┘
         │
         ▼
   rag/faiss_db/        data/
   FAISS 向量資料庫      靜態 JSON 資料
 ```
 
-### 熱門行程 × 收藏流程
+### 飛機航班查詢流程（LIFF）
 
 ```
-熱門行程
+使用者傳「飛機航班」
     │
     ▼
-四種行程類型卡片（自然 / 人文 / 美食 / 海上）
-    │  點選類型
+transport_query_handler
+    │  create_liff_token(user_id) → 產生 session token（30 分鐘有效）
     ▼
-行程詳細 carousel（每張含圖片、天數、景點）
-    │  點「⭐ 收藏行程」（postback）
+回傳 LIFF 入口按鈕（URI action）
+    │  使用者點開
     ▼
-寫入 storage/favorites/{user_id}.json
+LIFF 網頁 /liff/flight?token=xxx
+    │  填寫出發城市、日期、回程日期（可選）、旅客人數、嬰兒人數
+    │  點「查詢航班」
+    ▼
+POST /api/flight-search  （帶 token）
+    │  resolve_liff_token(token) → 取得 user_id
+    │  背景 Thread 執行爬蟲
+    ▼
+airline_service.search_flights()
+    │  ThreadPoolExecutor 同時查詢華信 + 立榮
+    ▼
+flex/flight_result.py → 航班結果 carousel
+    │  push_flex(user_id, ...)
+    ▼
+使用者收到 Flex carousel，每張卡片含「⭐ 收藏」按鈕
+```
 
-收藏清單
+### 熱門行程 × 收藏 × 詢價流程
+
+```
+熱門行程 → 行程詳細 carousel → 點「⭐ 收藏行程」
+                                    │
+                                    ▼
+                           storage/favorites/{user_id}.json
+
+收藏清單（輸入「收藏清單」）
     │
     ▼
-單一 bubble 列出所有收藏（每筆一行，旁邊有「詳情」「刪除」按鈕）
-    │  點「詳情」（postback）       點「刪除」（postback）
-    ▼                               ▼
-行程詳細卡片（含「取消收藏」按鈕）   從清單移除
+bubble 分類顯示（🗺️ 行程 / ✈️ 交通 / 🏨 住宿）
+    │  每筆：詳情按鈕 + 刪除按鈕
+    │  底部：「📩 確認詢價，通知負責人」按鈕
+    ▼
+點「確認詢價」（postback: confirm_inquiry）
+    │  reply → 告知使用者已收到
+    │  背景 Thread 執行寄信
+    ▼
+email_service.send_inquiry_email()
+    │  SMTP → 寄送心願清單明細給負責人
+    ▼
+負責人收到詢價 email（含用戶 LINE ID + 收藏清單）
 ```
 
 ### 智慧查詢 RAG 流程
@@ -89,7 +125,7 @@ user_demand_analysis()       ← Mistral 分析需求
 chat_with_schedule_rag()     ← FAISS 語意檢索 + Mistral 生成在地活動建議
     │  (EmbeddingGemma-300m 向量化，k=8 最相關文件)
     ▼
-travel_planner()             ← Mistral 整合需求與RAG結果，生成行程
+travel_planner()             ← Mistral 整合需求與 RAG 結果，生成行程
     │
     ▼
 critical_reviewer()          ← Mistral 審查行程合理性
@@ -98,7 +134,7 @@ critical_reviewer()          ← Mistral 審查行程合理性
 travel_replanner()           ← Mistral 依審查意見修正
     │
     ▼
-push_message() → 回傳給使用者
+push_message() → 回傳給使用者（含「⭐ 收藏此行程」按鈕）
 ```
 
 > 因流程耗時約 30 秒，採用 `reply()` 先回「規劃中」，背景 thread 完成後再 `push()` 推送結果。
@@ -110,48 +146,61 @@ push_message() → 回傳給使用者
 ```
 Penghu_linebot/
 │
-├── app.py                      # Flask 主程式，LINE Webhook 入口，對話狀態機
+├── app.py                      # Flask 主程式，Webhook 入口，LIFF 路由，對話狀態機
 ├── .env                        # 環境變數（API Keys，不進版控）
 ├── requirements.txt            # Python 套件清單
 │
 ├── handlers/                   # 對話流程控制器
+│   ├── theme_browse.py         # 主題清單：行程 / 美食 / 交通主題 carousel
 │   ├── popular_trip.py         # 熱門行程：類型選單 → 行程詳細卡片
-│   ├── favorites.py            # 收藏清單：顯示 / 刪除 / 詳情（postback）
+│   ├── favorites.py            # 收藏清單：顯示 / 刪除 / 詳情 / 確認詢價
 │   ├── smart_query.py          # 智慧查詢流程（呼叫 rag_service）
-│   ├── transport_query.py      # 交通查詢流程（航班 + 島內交通）
+│   ├── transport_query.py      # 交通查詢：LIFF 航班入口 + 島內交通
 │   └── room_query.py           # 空房查詢流程（待開發）
 │
 ├── services/                   # 資料服務層（純函式，只負責取資料）
-│   ├── airline_service.py      # 華信航空航班爬蟲（Selenium）
+│   ├── airline_service.py      # 華信 + 立榮航空爬蟲（Selenium + ThreadPoolExecutor）
+│   ├── email_service.py        # SMTP 寄信服務（詢價通知）
 │   ├── tide_service.py         # 澎管處潮汐爬蟲
 │   ├── weather_service.py      # 中央氣象署天氣 API
 │   └── rag_service.py          # RAG 智慧查詢核心（FAISS + Mistral pipeline）
 │
+├── utils/
+│   └── liff_token.py           # LIFF session token 機制（create / resolve）
+│
+├── templates/
+│   └── liff_flight.html        # LIFF 航班查詢表單頁面
+│
 ├── rag/                        # RAG 相關資料
 │   ├── faiss_db/               # FAISS 向量資料庫（已包含於版控）
-│   │   ├── index.faiss         # 向量索引
-│   │   └── index.pkl           # 文件對照表
-│   ├── source_docs/            # 建立向量庫的原始文件
+│   │   ├── index.faiss
+│   │   └── index.pkl
+│   ├── source_docs/
 │   │   └── Panghu_schedule_database.md   # 澎湖行程活動資料庫
 │   └── build_faiss.py          # 向量資料庫重建腳本
 │
 ├── flex/                       # LINE Flex Message 模板
+│   ├── theme_trip.py           # 行程主題 carousel（5 種旅遊風格）
+│   ├── theme_food.py           # 美食主題 carousel（5 種美食類型）
+│   ├── theme_transport.py      # 交通主題 carousel（5 種交通方式）
+│   ├── flight_liff_btn.py      # LIFF 入口按鈕 bubble
+│   ├── flight_result.py        # 航班查詢結果 carousel（含收藏按鈕）
 │   ├── trip_card.py            # 熱門行程類型輪播卡片
 │   ├── trip_detail.py          # 行程詳細卡片（含收藏 / 取消收藏按鈕）
-│   ├── transport_menu.py       # 交通查詢選單（島內 + 入島）
-│   ├── main_menu.py            # 五按鈕主選單（待開發）
-│   └── hotel_card.py           # 飯店資訊卡片（待開發）
+│   ├── smart_result.py         # 智慧查詢結果（含收藏 AI 行程按鈕）
+│   ├── transport_menu.py       # 交通查詢選單
+│   └── room_menu.py            # 空房查詢選單
 │
 ├── data/                       # 靜態 JSON 資料檔
-│   ├── popular_trips.json      # 熱門行程資料（4 類型 × 3 筆）
+│   ├── popular_trips.json      # 熱門行程資料
 │   └── hotels.json             # 飯店基本資訊（待填入）
 │
-├── storage/                    # 使用者持久化資料（不進版控）
-│   └── favorites/              # 每位使用者的收藏清單
-│       └── {user_id}.json      # 以 LINE user_id 命名
-│
-└── crawlers/                   # 爬蟲腳本（手動執行以更新 data/）
-    └── scenery_crawler.py      # 澎湖景點爬蟲（待開發）
+└── storage/                    # 使用者持久化資料（不進版控）
+    ├── favorites/              # 每位使用者的收藏清單
+    │   └── {user_id}.json
+    └── itineraries/            # AI 智慧查詢行程文字
+        ├── {user_id}_latest.txt
+        └── itinerary_{user_id}_{timestamp}.txt
 ```
 
 ---
@@ -162,13 +211,16 @@ Penghu_linebot/
 |------|------|
 | Web 框架 | Flask |
 | LINE Bot SDK | line-bot-sdk v3 (Python) |
-| 語言模型 | Mistral (`ministral-8b-latest`) via aisuite |
-| Embedding 模型 | `google/embeddinggemma-300m`（HuggingFace，需申請存取權） |
-| 向量資料庫 | FAISS (Facebook AI Similarity Search) |
+| LINE 前端 | LIFF（LINE Front-end Framework） |
+| 語言模型 | Mistral (`ministral-8b-latest`) |
+| Embedding 模型 | `google/embeddinggemma-300m`（HuggingFace） |
+| 向量資料庫 | FAISS |
 | RAG 框架 | LangChain Community |
 | 天氣資料 | 中央氣象署開放資料平台 API |
-| 航班資料 | 華信航空官網爬蟲（Selenium + headless Chrome） |
+| 航班資料 | 華信 + 立榮航空官網爬蟲（Selenium headless Chrome） |
+| 驗證碼辨識 | ddddocr（立榮航空） |
 | 潮汐資料 | 澎管處潮汐頁面爬蟲（requests + BeautifulSoup） |
+| Email | Python smtplib（STARTTLS，支援 Gmail） |
 | 本機測試 | ngrok（HTTPS tunnel） |
 
 ---
@@ -178,12 +230,34 @@ Penghu_linebot/
 `.env` 需設定以下變數：
 
 ```env
+# LINE Bot
 LINE_CHANNEL_ACCESS_TOKEN=your_token
 LINE_CHANNEL_SECRET=your_secret
+
+# LIFF
+LIFF_ID=your_liff_id
+
+# AI / RAG
 MISTRAL_API_KEY=your_mistral_key
+GEMINI_API_KEY=your_gemini_key
 HUGGINGFACE_HUB_TOKEN=your_hf_token
+
+# 氣象局
 OPENDATA_CWA_API_KEY=your_cwa_key
+
+# Email 通知（心願清單詢價）
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_gmail@gmail.com
+SMTP_PASS=your_app_password       # Gmail 請使用「應用程式密碼」
+NOTIFY_EMAIL=responsible@example.com
 ```
+
+### Gmail 應用程式密碼取得方式
+
+1. Google 帳戶 → **安全性** → 開啟**兩步驟驗證**
+2. 安全性 → **應用程式密碼** → 選「郵件」→ 產生
+3. 將 16 位數密碼填入 `SMTP_PASS`
 
 ---
 
@@ -205,6 +279,11 @@ python app.py
 https://xxxx.ngrok-free.app/callback
 ```
 
+LIFF Endpoint URL 設定為：
+```
+https://xxxx.ngrok-free.app/liff/flight
+```
+
 ---
 
 ## 向量資料庫更新
@@ -213,74 +292,80 @@ https://xxxx.ngrok-free.app/callback
 
 **僅在 `rag/source_docs/Panghu_schedule_database.md` 有更新時**，才需要重新執行：
 
-### 前置條件
-
 1. 登入 HuggingFace 並取得 `google/embeddinggemma-300m` 存取權限
-   - 申請：`https://huggingface.co/google/embeddinggemma-300m`
 2. 登入 HuggingFace CLI
    ```bash
    python -c "from huggingface_hub import login; login(token='你的token')"
    ```
-
-### 重建向量庫
-
-```bash
-python rag/build_faiss.py
-```
-
-執行時間約 10–20 分鐘（含模型下載），完成後將 `rag/faiss_db/` 重新 commit 進版控。
+3. 重建向量庫（約 10–20 分鐘）
+   ```bash
+   python rag/build_faiss.py
+   ```
+4. 將 `rag/faiss_db/` 重新 commit 進版控
 
 ---
 
 ## 各模組分工說明
 
-### app.py — 對話狀態機 + Postback 路由
+### app.py — Webhook 入口 + LIFF 路由
 
 - `user_states` dict 儲存每位使用者目前的對話步驟
-- `MessageEvent` → `handle_message()` 依序呼叫各 handler
-- `PostbackEvent` → `favorites_handler.handle_postback()` 處理收藏/刪除/詳情
+- `MessageEvent` → `handle_message()` 依序呼叫各 handler（先到先處理）
+- `PostbackEvent` → `transport_query_handler` 處理航班 postback；`favorites_handler` 處理收藏 postback
+- `/liff/flight` → 注入 LIFF ID 與 session token 後渲染 HTML 表單
+- `/api/flight-search` → 以 token 換回 user_id，背景執行爬蟲，完成後 push Flex carousel
 
 ### handlers/ — 流程控制
 
 負責「問什麼問題、等什麼輸入、何時呼叫 service / flex」，不處理資料取得邏輯。
 
-### favorites.py — 收藏清單
-
-- 收藏清單以單一 bubble 呈現，每筆行程一行，旁邊有「詳情」「刪除」兩個按鈕
-- 點「詳情」→ 顯示行程卡片，footer 改為「取消收藏」（紅色）
-- 收藏資料儲存於 `storage/favorites/{user_id}.json`
+| 檔案 | 負責內容 |
+|------|----------|
+| `theme_browse.py` | 行程 / 美食 / 交通主題 carousel |
+| `popular_trip.py` | 熱門行程展示與收藏 |
+| `favorites.py` | 收藏清單 CRUD + 確認詢價寄信 |
+| `smart_query.py` | 智慧查詢多輪對話 + AI 行程收藏 |
+| `transport_query.py` | LIFF 航班入口 + 島內交通文字說明 |
 
 ### services/ — 資料服務
 
-純函式，輸入參數回傳結果。handler 呼叫 service，service 不知道對話存在。
+純函式，輸入參數回傳結果，不依賴對話狀態。
 
-### rag_service.py — RAG 核心
+| 檔案 | 負責內容 |
+|------|----------|
+| `airline_service.py` | 華信 + 立榮航空 Selenium 爬蟲，ThreadPoolExecutor 並行查詢 |
+| `email_service.py` | smtplib SMTP 寄信，格式化心願清單內容 |
+| `rag_service.py` | 4 步驟 RAG pipeline（需求分析 → 檢索 → 規劃 → 審查修正） |
+| `weather_service.py` | 氣象署 API 天氣查詢 |
+| `tide_service.py` | 澎管處潮汐爬蟲 |
 
-- **模組載入時**初始化 EmbeddingGemma + FAISS（只載入一次，避免重複耗時 2 分鐘）
-- 提供 `rag_smart_reply(user_text: str) -> str` 單一入口
-- 內部執行 4 步驟 pipeline（需求分析 → RAG檢索 → 行程規劃 → 審查修正）
+### utils/liff_token.py — Session Token 機制
 
-### airline_service.py — 航班爬蟲
+避免 LIFF `userId` 與 Messaging API `userId` 不一致的問題（不同 Provider 下會拿到不同值）。
 
-- 使用 Selenium headless Chrome 操作華信航空官網
-- 對外提供 `search_flights(dep_code, arr_code, date_str)` 與 `format_result()` 兩個函式
+- `create(user_id, ttl_minutes=30)` → bot 側產生隨機 token 注入 LIFF URL
+- `resolve(token)` → LIFF 提交時帶 token 換回正確 user_id，一次性使用後自動刪除
 
 ---
 
 ## 待開發項目
 
 - [x] `services/rag_service.py` — RAG 智慧查詢核心
-- [x] `handlers/smart_query.py` — 智慧查詢對話流程
+- [x] `handlers/smart_query.py` — 智慧查詢對話流程（含 AI 行程收藏）
 - [x] `rag/build_faiss.py` — 向量資料庫建立腳本
-- [x] `handlers/transport_query.py` — 航班 + 島內交通查詢流程
-- [x] `flex/transport_menu.py` — 交通查詢 Flex Message 選單
+- [x] `handlers/transport_query.py` — LIFF 航班入口 + 島內交通
+- [x] `services/airline_service.py` — 華信 + 立榮航空並行爬蟲
+- [x] `flex/flight_result.py` — 航班結果 Flex carousel（含收藏按鈕）
+- [x] `utils/liff_token.py` — Session token 機制
+- [x] `templates/liff_flight.html` — LIFF 航班查詢互動表單
 - [x] `handlers/popular_trip.py` — 熱門行程展示
 - [x] `flex/trip_card.py` — 行程類型輪播卡片
 - [x] `flex/trip_detail.py` — 行程詳細卡片（含收藏/取消收藏）
-- [x] `handlers/favorites.py` — 收藏清單 CRUD
-- [x] `data/popular_trips.json` — 熱門行程資料（暫用測試資料）
+- [x] `handlers/favorites.py` — 收藏清單 CRUD + 確認詢價
+- [x] `services/email_service.py` — 心願清單詢價 email 通知
+- [x] `flex/theme_trip.py` — 行程主題 carousel
+- [x] `flex/theme_food.py` — 美食主題 carousel
+- [x] `flex/theme_transport.py` — 交通主題 carousel
 - [ ] `handlers/room_query.py` — 空房查詢流程
-- [ ] `flex/main_menu.py` — 主選單 Flex Message
-- [ ] `flex/hotel_card.py` — 飯店資訊卡片
 - [ ] `data/hotels.json` — 飯店資訊填入
 - [ ] `data/popular_trips.json` — 替換為正式行程資料

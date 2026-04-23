@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>✈️ 飛機航班查詢</title>
+    <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary:      #4EADAC;
+            --primary-dark: #3d9190;
+            --bg:           #f0f2f5;
+            --card:         #ffffff;
+            --text:         #333333;
+            --muted:        #888888;
+            --border:       #e0e0e0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: 88px;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 16px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ── Card section ── */
+        .section {
+            background: var(--card);
+            margin: 12px 12px 0;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .section-title {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        /* ── Toggle buttons (行程類型) ── */
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-toggle {
+            flex: 1;
+            padding: 11px 8px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, color 0.15s;
+        }
+
+        .btn-toggle.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+            font-weight: 700;
+        }
+
+        /* ── City grid ── */
+        .city-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .btn-city {
+            padding: 13px 8px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, color 0.15s;
+        }
+
+        .btn-city.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+            font-weight: 700;
+        }
+
+        /* ── Date input ── */
+        .date-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 15px;
+            color: var(--text);
+            background: white;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .date-input:focus {
+            border-color: var(--primary);
+        }
+
+        /* ── Counter ── */
+        .counter {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+
+        .btn-counter {
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            border: 2px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s, color 0.1s;
+            flex-shrink: 0;
+        }
+
+        .btn-counter:active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-counter:disabled {
+            border-color: var(--border);
+            color: var(--border);
+            cursor: not-allowed;
+        }
+
+        .counter-value {
+            font-size: 26px;
+            font-weight: 700;
+            min-width: 56px;
+            text-align: center;
+        }
+
+        .counter-unit {
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        /* ── Destination fixed row ── */
+        .dest-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dest-value {
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        /* ── Collapsible return section ── */
+        #ret-section {
+            display: none;
+        }
+        #ret-section.visible {
+            display: block;
+        }
+
+        /* ── Submit bar ── */
+        .submit-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px 16px 16px;
+            background: white;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-submit:active  { background: var(--primary-dark); }
+        .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 88px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.72);
+            color: white;
+            padding: 10px 22px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+            white-space: nowrap;
+            z-index: 200;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">✈️ 飛機航班查詢</div>
+
+<!-- 行程類型 -->
+<div class="section">
+    <div class="section-title">行程類型</div>
+    <div class="btn-group">
+        <button class="btn-toggle active" onclick="setTripType('one_way', this)">✈ 單程</button>
+        <button class="btn-toggle"        onclick="setTripType('round_trip', this)">🔄 來回</button>
+    </div>
+</div>
+
+<!-- 出發城市 -->
+<div class="section">
+    <div class="section-title">出發城市</div>
+    <div class="city-grid">
+        <button class="btn-city" onclick="setCity('TSA','台北',this)">台北（松山）</button>
+        <button class="btn-city" onclick="setCity('RMQ','台中',this)">台中</button>
+        <button class="btn-city" onclick="setCity('CYI','嘉義',this)">嘉義</button>
+        <button class="btn-city" onclick="setCity('KHH','高雄',this)">高雄</button>
+    </div>
+</div>
+
+<!-- 出發日期 -->
+<div class="section">
+    <div class="section-title">出發日期</div>
+    <input type="date" id="dep-date" class="date-input">
+</div>
+
+<!-- 回程日期（來回才顯示） -->
+<div class="section" id="ret-section">
+    <div class="section-title">回程日期</div>
+    <input type="date" id="ret-date" class="date-input">
+</div>
+
+<!-- 旅客人數 -->
+<div class="section">
+    <div class="section-title">旅客（2歲以上）</div>
+    <div class="counter">
+        <button class="btn-counter" id="pax-dec" onclick="adjust('pax',-1)">－</button>
+        <span class="counter-value" id="pax-val">1</span>
+        <button class="btn-counter" id="pax-inc" onclick="adjust('pax',+1)">＋</button>
+        <span class="counter-unit">&nbsp;人</span>
+    </div>
+</div>
+
+<!-- 嬰兒人數 -->
+<div class="section">
+    <div class="section-title">嬰兒（未滿2歲）</div>
+    <div class="counter">
+        <button class="btn-counter" id="inf-dec" onclick="adjust('inf',-1)">－</button>
+        <span class="counter-value" id="inf-val">0</span>
+        <button class="btn-counter" id="inf-inc" onclick="adjust('inf',+1)">＋</button>
+        <span class="counter-unit">&nbsp;人</span>
+    </div>
+</div>
+
+<!-- 目的地（固定） -->
+<div class="section" style="margin-bottom:12px;">
+    <div class="dest-row">
+        <span class="section-title" style="margin:0;">目的地</span>
+        <span class="dest-value">澎湖 🔒</span>
+    </div>
+</div>
+
+<!-- 送出 -->
+<div class="submit-bar">
+    <button class="btn-submit" id="submit-btn" onclick="submitForm()">🔍 查詢航班</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+const state = {
+    tripType:   'one_way',
+    departure:  null,
+    depName:    null,
+    date:       null,
+    retDate:    null,
+    passengers: 1,
+    infants:    0
+};
+
+// token 由 Flask 注入，用來在 server 換回正確的 user_id
+const SESSION_TOKEN = '{{ token }}';
+
+// ── LIFF 初始化 ────────────────────────────────────────────────
+(async () => {
+    try {
+        await liff.init({ liffId: '{{ liff_id }}' });
+    } catch (e) {
+        console.error('LIFF init error:', e);
+    }
+
+    // 設定最小日期為今天
+    const today = new Date().toISOString().split('T')[0];
+    const depEl = document.getElementById('dep-date');
+    const retEl = document.getElementById('ret-date');
+    depEl.min = today;
+    depEl.value = today;
+    retEl.min = today;
+    state.date = today.replace(/-/g, '/');
+
+    depEl.addEventListener('change', e => {
+        state.date = e.target.value.replace(/-/g, '/');
+        retEl.min = e.target.value;          // 回程不能早於去程
+        if (retEl.value && retEl.value < e.target.value) {
+            retEl.value = e.target.value;
+            state.retDate = state.date;
+        }
+    });
+    retEl.addEventListener('change', e => {
+        state.retDate = e.target.value.replace(/-/g, '/');
+    });
+
+    refreshCounterBtns();
+})();
+
+// ── 行程類型 ───────────────────────────────────────────────────
+function setTripType(type, btn) {
+    state.tripType = type;
+    document.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const retSec = document.getElementById('ret-section');
+    if (type === 'round_trip') {
+        retSec.classList.add('visible');
+    } else {
+        retSec.classList.remove('visible');
+        state.retDate = null;
+        document.getElementById('ret-date').value = '';
+    }
+}
+
+// ── 城市選擇 ───────────────────────────────────────────────────
+function setCity(code, name, btn) {
+    state.departure = code;
+    state.depName   = name;
+    document.querySelectorAll('.btn-city').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+// ── 人數加減 ───────────────────────────────────────────────────
+function adjust(type, delta) {
+    if (type === 'pax') {
+        state.passengers = Math.max(1, Math.min(9, state.passengers + delta));
+        state.infants    = Math.min(state.infants, state.passengers);
+        document.getElementById('pax-val').textContent = state.passengers;
+        document.getElementById('inf-val').textContent = state.infants;
+    } else {
+        state.infants = Math.max(0, Math.min(state.passengers, state.infants + delta));
+        document.getElementById('inf-val').textContent = state.infants;
+    }
+    refreshCounterBtns();
+}
+
+function refreshCounterBtns() {
+    document.getElementById('pax-dec').disabled = state.passengers <= 1;
+    document.getElementById('pax-inc').disabled = state.passengers >= 9;
+    document.getElementById('inf-dec').disabled = state.infants <= 0;
+    document.getElementById('inf-inc').disabled = state.infants >= state.passengers;
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ── 送出查詢 ───────────────────────────────────────────────────
+async function submitForm() {
+    if (!state.departure)               { showToast('❌ 請選擇出發城市'); return; }
+    if (!state.date)                    { showToast('❌ 請選擇出發日期'); return; }
+    if (state.tripType === 'round_trip' && !state.retDate) {
+        showToast('❌ 來回行程請選擇回程日期'); return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = '查詢中，請稍候...';
+
+    try {
+        const res = await fetch('/api/flight-search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token:      SESSION_TOKEN,
+                trip_type:  state.tripType,
+                departure:  state.departure,
+                dep_name:   state.depName,
+                date:       state.date,
+                ret_date:   state.retDate || '',
+                passengers: state.passengers,
+                infants:    state.infants
+            })
+        });
+
+        if (!res.ok) throw new Error('server error');
+
+        btn.textContent = '✅ 查詢已送出，稍後將推送結果';
+        setTimeout(() => liff.closeWindow(), 1800);
+
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '🔍 查詢航班';
+        showToast('⚠️ 送出失敗，請重試');
+    }
+}
+</script>
+</body>
+</html>

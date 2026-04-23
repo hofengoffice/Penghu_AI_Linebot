@@ -2,61 +2,46 @@
 交通查詢對話流程 handler
 
 功能：
-    - 交通查詢 → 顯示交通選單 Flex Message
-    - 飛機航班 → 引導輸入出發城市、抵達城市、日期，查詢華信航空航班
-    - 船班資訊 → 顯示台華輪訂票連結
-    - 租車服務 / 機車租借 / 自行車漫遊 → 顯示提示文字
-
-對話步驟（user_states 的 step 欄位）：
-    transport_flight_departure  ─ 等待輸入出發城市
-    transport_flight_arrival    ─ 等待輸入抵達城市
-    transport_flight_date       ─ 等待輸入出發日期
+    - 交通查詢   → 顯示交通選單 Flex Message
+    - 飛機航班   → 送出 LIFF 入口按鈕，使用者在 LIFF 網頁填寫查詢條件後送出，
+                   bot 在背景執行爬蟲並 push 結果（整個流程不產生中間訊息）
+    - 船班資訊   → 顯示台華輪靜態資訊
+    - 租車服務 / 機車租借 / 自行車漫遊 → 顯示靜態文字
 """
 
+import os
+
 from flex.transport_menu import get_transport_menu
-from services.airline_service import search_flights, format_result
-from services.tide_service import get_today_tide, format_tide_entry
-from datetime import datetime
+from flex.flight_liff_btn import get_flight_liff_btn
+from utils.liff_token import create as create_liff_token
 
-# 城市名稱 → 航班代碼對照表（華信航空）
-CITY_CODES = {
-    "台北": "TSA",
-    "台中": "RMQ",
-    "嘉義": "CYI",
-    "高雄": "KHH",
-    "澎湖": "MZG"
-}
 
-CITY_OPTIONS = "、".join(CITY_CODES.keys())  # 台北、台中、嘉義、高雄、澎湖
-
+# ── 訊息入口 ────────────────────────────────────────────────
 
 def handle(user_id, text, reply_token, user_states, reply_fn, push_fn, reply_flex_fn):
     """
-    交通查詢主入口。
-
-    參數：
-        user_id      : LINE 使用者 ID
-        text         : 使用者輸入文字
-        reply_token  : LINE reply token（即時回覆用）
-        user_states  : 全域對話狀態 dict
-        reply_fn     : reply(reply_token, text) 函式
-        push_fn      : push(user_id, text) 函式
-        reply_flex_fn: reply_flex(reply_token, flex_dict, alt_text) 函式
+    交通查詢主入口（處理文字訊息）。
 
     回傳：
         True  → 此訊息已由本 handler 處理
         False → 非本 handler 負責，交由下一個 handler 判斷
     """
-    state = user_states.get(user_id, {})
-    step = state.get("step", "start")
 
-    # ── 入口：使用者點選「交通查詢」選單按鈕 ──────────────
+    # ── 入口：交通選單 ──
     if text == "交通查詢":
-        user_states[user_id] = {"step": "transport_menu"}
+        user_states[user_id] = {"step": "start"}
         reply_flex_fn(reply_token, get_transport_menu(), "🚌 交通查詢")
         return True
 
-    # ── 島內交通：靜態資訊回覆 ─────────────────────────────
+    # ── 飛機航班：送出 LIFF 入口按鈕（URL 帶一次性 token，不依賴 LIFF userId）──
+    if text == "飛機航班":
+        liff_id  = os.getenv("LIFF_ID", "")
+        token    = create_liff_token(user_id)
+        liff_url = f"https://liff.line.me/{liff_id}?token={token}"
+        reply_flex_fn(reply_token, get_flight_liff_btn(liff_url), "🛫 飛機航班查詢")
+        return True
+
+    # ── 島內交通：靜態資訊 ──
     if text == "租車服務":
         reply_fn(reply_token,
             "🚗 澎湖租車服務\n\n"
@@ -94,7 +79,7 @@ def handle(user_id, text, reply_token, user_states, reply_fn, push_fn, reply_fle
         user_states[user_id] = {"step": "start"}
         return True
 
-    # ── 入島交通：船班資訊（靜態） ────────────────────────
+    # ── 入島交通：船班資訊（靜態） ──
     if text == "船班資訊":
         reply_fn(reply_token,
             "⛴ 澎湖船班資訊\n\n"
@@ -111,78 +96,15 @@ def handle(user_id, text, reply_token, user_states, reply_fn, push_fn, reply_fle
         user_states[user_id] = {"step": "start"}
         return True
 
-    # ── 入島交通：飛機航班查詢（多步驟對話） ────────────────
-    if text == "飛機航班":
-        user_states[user_id] = {"step": "transport_flight_departure"}
-        reply_fn(reply_token,
-            f"🛫 飛機航班查詢\n\n請輸入出發城市：\n{CITY_OPTIONS}"
-        )
-        return True
-
-    if step == "transport_flight_departure":
-        code = CITY_CODES.get(text)
-        if not code:
-            reply_fn(reply_token, f"❌ 無法識別城市，請輸入：{CITY_OPTIONS}")
-            return True
-        user_states[user_id] = {"step": "transport_flight_arrival", "departure": code, "dep_name": text}
-        reply_fn(reply_token, f"📍 出發：{text}\n\n請輸入抵達城市：\n{CITY_OPTIONS}")
-        return True
-
-    if step == "transport_flight_arrival":
-        code = CITY_CODES.get(text)
-        if not code:
-            reply_fn(reply_token, f"❌ 無法識別城市，請輸入：{CITY_OPTIONS}")
-            return True
-        user_states[user_id] = {
-            **state,
-            "step": "transport_flight_date",
-            "arrival": code,
-            "arr_name": text
-        }
-        dep_name = state.get("dep_name", "")
-        reply_fn(reply_token,
-            f"📍 {dep_name} → {text}\n\n請輸入出發日期：\n格式：2026/05/16"
-        )
-        return True
-
-    if step == "transport_flight_date":
-        date = _parse_date(text)
-        if not date:
-            reply_fn(reply_token, "❌ 日期格式錯誤，請使用 2026/05/16 格式")
-            return True
-
-        departure = state.get("departure")
-        arrival = state.get("arrival")
-        dep_name = state.get("dep_name", departure)
-        arr_name = state.get("arr_name", arrival)
-
-        reply_fn(reply_token, f"🔍 查詢中：{dep_name} → {arr_name}  {date}，請稍候...")
-        user_states[user_id] = {"step": "start"}
-
-        # 在背景執行航班查詢（網路請求可能較慢）
-        import threading
-        def _search():
-            try:
-                flights = search_flights(departure, arrival, date)
-                result = format_result(dep_name, arr_name, date, flights, 1)
-            except Exception as e:
-                result = f"⚠️ 查詢失敗，請稍後再試。\n（{e}）"
-            push_fn(user_id, result)
-
-        threading.Thread(target=_search, daemon=True).start()
-        return True
-
     return False
 
 
-def _parse_date(text):
+# ── Postback 入口 ────────────────────────────────────────────
+
+def handle_postback(user_id, data, date_param, reply_token, user_states,
+                    reply_fn, push_fn, reply_flex_fn):
     """
-    解析日期輸入，支援 2026/05/16 或 2026-05-16 格式。
-    回傳 'YYYY/MM/DD' 字串，格式錯誤回傳 None。
+    飛機查詢已改為 LIFF 流程，此 handler 不再處理 flight_* postback。
+    保留函式簽名供 app.py 呼叫，一律回傳 False。
     """
-    import re
-    text = text.strip()
-    m = re.fullmatch(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", text)
-    if m:
-        return f"{m.group(1)}/{int(m.group(2)):02d}/{int(m.group(3)):02d}"
-    return None
+    return False

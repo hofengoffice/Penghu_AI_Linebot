@@ -1,0 +1,97 @@
+"""
+Email 通知服務
+
+功能：
+    - send_inquiry_email(user_id, favorites)
+        當客人確認心願清單後，寄送詢價通知給負責人。
+
+設定（.env）：
+    SMTP_HOST     SMTP 伺服器，預設 smtp.gmail.com
+    SMTP_PORT     SMTP 埠號，預設 587（STARTTLS）
+    SMTP_USER     寄件人帳號（Gmail 即 xxx@gmail.com）
+    SMTP_PASS     寄件人密碼（Gmail 請用「應用程式密碼」）
+    NOTIFY_EMAIL  負責人收件信箱
+"""
+
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from datetime import datetime
+
+# 分類名稱對照
+_CAT_LABEL = {
+    "trip":          "🗺️ 熱門行程",
+    "itinerary":     "🗺️ AI 規劃行程",
+    "transport":     "✈️ 交通（航班）",
+    "accommodation": "🏨 住宿",
+}
+
+
+def _build_email_body(user_id: str, favorites: list) -> str:
+    """產生純文字 email 內容"""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    lines = [
+        "【澎湖旅遊 LINE Bot】心願清單詢價通知",
+        "=" * 40,
+        f"收到時間：{now}",
+        f"LINE 用戶 ID：{user_id}",
+        "",
+        "── 心願清單內容 ──",
+    ]
+
+    if not favorites:
+        lines.append("（清單為空）")
+    else:
+        # 依分類整理
+        from_types = {}
+        for item in favorites:
+            t = item.get("type", "other")
+            from_types.setdefault(t, []).append(item)
+
+        for t, items in from_types.items():
+            label = _CAT_LABEL.get(t, t)
+            lines.append(f"\n{label}")
+            for item in items:
+                name = item.get("name", "（未命名）")
+                lines.append(f"  • {name}")
+
+    lines += [
+        "",
+        "=" * 40,
+        "請儘速回覆客人，謝謝！",
+        "（此信由系統自動發送，請勿直接回覆）",
+    ]
+    return "\n".join(lines)
+
+
+def send_inquiry_email(user_id: str, favorites: list) -> None:
+    """
+    寄送詢價通知 email 給負責人。
+
+    raises:
+        ValueError  若 SMTP 設定不完整
+        Exception   若 SMTP 連線或傳送失敗
+    """
+    smtp_host    = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port    = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user    = os.getenv("SMTP_USER", "").strip()
+    smtp_pass    = os.getenv("SMTP_PASS", "").strip()
+    notify_email = os.getenv("NOTIFY_EMAIL", "").strip()
+
+    if not smtp_user or not smtp_pass or not notify_email:
+        raise ValueError("SMTP 設定不完整，請在 .env 填寫 SMTP_USER / SMTP_PASS / NOTIFY_EMAIL")
+
+    body = _build_email_body(user_id, favorites)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"【澎湖旅遊】心願清單詢價通知 {datetime.now().strftime('%m/%d %H:%M')}"
+    msg["From"]    = smtp_user
+    msg["To"]      = notify_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, notify_email, msg.as_string())

@@ -12,6 +12,10 @@ Panghu_AI_Leader/
 
 # 使用者資料
 storage/favorites/
+storage/itineraries/
+
+# Debug 截圖
+debug_*.png
 
 # HuggingFace 模型快取（不需進版控）
 .cache/

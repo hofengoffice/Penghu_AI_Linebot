@@ -7,7 +7,8 @@
 """
 
 import os
-from flask import Flask, request, abort
+import threading
+from flask import Flask, request, abort, jsonify, render_template
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import (
@@ -23,6 +24,7 @@ import handlers.transport_query as transport_query_handler
 import handlers.popular_trip as popular_trip_handler
 import handlers.favorites as favorites_handler
 import handlers.room_query as room_query_handler
+import handlers.theme_browse as theme_browse_handler
 
 load_dotenv()
 
@@ -55,6 +57,21 @@ def push(user_id, text):
             )
         )
 
+def push_flex(user_id, flex_dict, alt_text="訊息"):
+    """主動推送 Flex Message（無時效限制，適合背景作業完成後使用）"""
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).push_message(
+            PushMessageRequest(
+                to=user_id,
+                messages=[
+                    FlexMessage(
+                        alt_text=alt_text,
+                        contents=FlexContainer.from_dict(flex_dict)
+                    )
+                ]
+            )
+        )
+
 def reply_flex(reply_token, flex_dict, alt_text="選單"):
     """即時回覆 Flex Message（bubble 或 carousel）"""
     with ApiClient(configuration) as api_client:
@@ -78,6 +95,10 @@ def handle_message(user_id, text, reply_token):
     """
     text = text.strip()
 
+    # ── 主題清單（行程/美食/交通主題）────────────────────────
+    if theme_browse_handler.handle(user_id, text, reply_token, user_states, reply, push, reply_flex):
+        return
+
     # ── 熱門行程 ──────────────────────────────────────────
     if popular_trip_handler.handle(user_id, text, reply_token, user_states, reply, push, reply_flex):
         return
@@ -95,7 +116,7 @@ def handle_message(user_id, text, reply_token):
         return
 
     # ── 智慧查詢 ──────────────────────────────────────────
-    if smart_query_handler.handle(user_id, text, reply_token, user_states, reply, push):
+    if smart_query_handler.handle(user_id, text, reply_token, user_states, reply, push, push_flex):
         return
 
 
@@ -114,19 +135,96 @@ def callback():
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_text(event):
     """接收文字訊息事件，取出 user_id、文字、reply_token 後傳入分派中心"""
+    print(f"[Messaging API] user_id={event.source.user_id!r}")
     handle_message(event.source.user_id, event.message.text, event.reply_token)
 
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
-    """接收 postback 事件（如收藏、刪除、詳情按鈕），交給 favorites handler 處理"""
-    favorites_handler.handle_postback(
-        event.source.user_id,
-        event.postback.data,
-        event.reply_token,
-        reply,
-        reply_flex
-    )
+    """
+    接收所有 postback 事件，依 action 前綴分派：
+        flight_* → transport_query_handler（飛機表單互動）
+        其他     → favorites_handler（收藏、刪除、詳情）
+    """
+    user_id     = event.source.user_id
+    data        = event.postback.data
+    reply_token = event.reply_token
+
+    # datetimepicker 的日期回傳在 postback.params，其他 postback 為 None
+    date_param = None
+    if hasattr(event.postback, "params") and event.postback.params:
+        date_param = event.postback.params.get("date")
+
+    # 飛機表單 postback
+    if transport_query_handler.handle_postback(
+        user_id, data, date_param, reply_token, user_states,
+        reply, push, reply_flex
+    ):
+        return
+
+    # 收藏相關 postback
+    favorites_handler.handle_postback(user_id, data, reply_token, reply, reply_flex)
+
+
+@app.route("/liff/flight")
+def liff_flight():
+    """提供 LIFF 飛機查詢頁面，將 URL 中的 token 注入模板"""
+    liff_id = os.getenv("LIFF_ID", "")
+    token   = request.args.get("token", "")
+    return render_template("liff_flight.html", liff_id=liff_id, token=token)
+
+
+@app.route("/api/flight-search", methods=["POST"])
+def api_flight_search():
+    """
+    接收 LIFF 送出的查詢表單，在背景執行爬蟲後 push 結果給使用者。
+    以 token 換回 user_id，不依賴 LIFF 的 userId。
+    """
+    from services.airline_service import search_flights, format_result
+    from utils.liff_token import resolve as resolve_liff_token
+
+    data    = request.get_json(force=True)
+    token   = data.get("token", "")
+    user_id = resolve_liff_token(token) if token else None
+    departure  = data.get("departure")
+    dep_name   = data.get("dep_name", "")
+    date_str   = data.get("date")
+    ret_date   = data.get("ret_date", "")
+    passengers = int(data.get("passengers", 1))
+    infants    = int(data.get("infants", 0))
+
+    if not user_id or not departure or not date_str:
+        return jsonify({"error": "缺少必要參數"}), 400
+
+    print(f"[LIFF] user_id={user_id!r}  departure={departure}  date={date_str}")
+
+    def _search():
+        from flex.flight_result import get_flight_result_flex
+        try:
+            # 去程
+            flights_out = search_flights(departure, "MZG", date_str, passengers, infants)
+
+            # 來回
+            flights_ret = None
+            if ret_date:
+                flights_ret = search_flights("MZG", departure, ret_date, passengers, infants)
+
+            flex_dict = get_flight_result_flex(
+                flights_out, dep_name, "澎湖", date_str,
+                flights_ret, ret_date or None
+            )
+
+            alt = f"✈️ {dep_name}→澎湖 {date_str} 航班查詢結果"
+            push_flex(user_id, flex_dict, alt)
+
+            if infants:
+                push(user_id, f"提醒：嬰兒 {infants} 名請至各航空官網另行加購嬰兒票")
+
+        except Exception as e:
+            push(user_id, f"⚠️ 查詢失敗，請稍後再試。\n（{e}）")
+
+    threading.Thread(target=_search, daemon=True).start()
+    return jsonify({"status": "queued"})
 
 
 if __name__ == "__main__":
