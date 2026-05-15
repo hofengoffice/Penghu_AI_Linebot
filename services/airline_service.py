@@ -117,14 +117,23 @@ def run_search_mandarin(driver, wait, dep_code, arr_code, date_str, adult_count)
     return get_flight_info(driver, f"{date_str} {AIRPORTS_INV.get(dep_code, dep_code)} -> {AIRPORTS_INV.get(arr_code, arr_code)}")
 
 
+def _chrome_options():
+    """建立適用本機與 Render 雲端環境的 Chrome options"""
+    opts = Options()
+    opts.add_argument("--headless")
+    opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")
+    opts.add_argument("--window-size=1920,1080")
+    # Render 雲端環境：chromium 裝在固定路徑
+    chromium_path = "/usr/bin/chromium"
+    if os.path.exists(chromium_path):
+        opts.binary_location = chromium_path
+    return opts
+
+
 def search_mandarin_flights(dep_code, arr_code, date_str, passengers=1):
     """查詢華信航空單程航班，回傳含「航空公司」欄位的 list"""
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1920,1080")
-
+    chrome_options = _chrome_options()
     driver = webdriver.Chrome(options=chrome_options)
     wait = WebDriverWait(driver, 15)
 
@@ -357,15 +366,16 @@ def search_uniair_flights(dep_code, arr_code, date_str, passengers=1, infants=0)
     dep_name = CODE_TO_UNIAIR_NAME.get(dep_code, dep_code)
     arr_name = CODE_TO_UNIAIR_NAME.get(arr_code, arr_code)
 
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options = _chrome_options()
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--ignore-ssl-errors")
-    chrome_options.add_argument("--window-size=1920,1080")
 
-    service = Service(ChromeDriverManager().install())
+    # Render 雲端環境：使用系統安裝的 chromedriver
+    chromedriver_path = "/usr/bin/chromedriver"
+    if os.path.exists(chromedriver_path):
+        service = Service(chromedriver_path)
+    else:
+        service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:

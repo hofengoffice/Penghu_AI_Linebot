@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: penghu-linebot
+    runtime: python
+    buildCommand: |
+      apt-get update && apt-get install -y chromium-driver chromium
+      pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: LINE_CHANNEL_ACCESS_TOKEN
+        sync: false
+      - key: LINE_CHANNEL_SECRET
+        sync: false
+      - key: LIFF_ID
+        sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: HUGGINGFACE_HUB_TOKEN
+        sync: false
+      - key: OPENDATA_CWA_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: NOTIFY_EMAIL
+        sync: false
