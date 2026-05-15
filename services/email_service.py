@@ -28,14 +28,14 @@ _CAT_LABEL = {
 }
 
 
-def _build_email_body(user_id: str, favorites: list) -> str:
+def _build_email_body(order_no: str, favorites: list) -> str:
     """產生純文字 email 內容"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     lines = [
         "【澎湖旅遊 LINE Bot】心願清單詢價通知",
         "=" * 40,
         f"收到時間：{now}",
-        f"LINE 用戶 ID：{user_id}",
+        f"訂單編號：{order_no}",
         "",
         "── 心願清單內容 ──",
     ]
@@ -65,7 +65,12 @@ def _build_email_body(user_id: str, favorites: list) -> str:
     return "\n".join(lines)
 
 
-def send_inquiry_email(user_id: str, favorites: list) -> None:
+def generate_order_no() -> str:
+    """產生訂單編號，格式：PH-YYYYMMDD-HHMMSS"""
+    return datetime.now().strftime("PH-%Y%m%d-%H%M%S")
+
+
+def send_inquiry_email(order_no: str, favorites: list) -> None:
     """
     寄送詢價通知 email 給負責人。
 
@@ -82,10 +87,10 @@ def send_inquiry_email(user_id: str, favorites: list) -> None:
     if not smtp_user or not smtp_pass or not notify_email:
         raise ValueError("SMTP 設定不完整，請在 .env 填寫 SMTP_USER / SMTP_PASS / NOTIFY_EMAIL")
 
-    body = _build_email_body(user_id, favorites)
+    body = _build_email_body(order_no, favorites)
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"【澎湖旅遊】心願清單詢價通知 {datetime.now().strftime('%m/%d %H:%M')}"
+    msg["Subject"] = f"【澎湖旅遊】心願清單詢價 {order_no}"
     msg["From"]    = smtp_user
     msg["To"]      = notify_email
     msg.attach(MIMEText(body, "plain", "utf-8"))

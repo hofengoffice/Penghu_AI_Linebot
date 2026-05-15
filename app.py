@@ -95,6 +95,19 @@ def handle_message(user_id, text, reply_token):
     """
     text = text.strip()
 
+    # ── 真人客服模式 ──────────────────────────────────────
+    if text == "真人客服":
+        user_states[user_id] = {"step": "human_mode"}
+        reply(reply_token, "已為您轉接真人客服 👨‍💼\n工作人員將盡快回覆您，感謝您的耐心等候。\n\n如需返回 AI 助理，請輸入「結束客服」")
+        return
+
+    if user_states.get(user_id, {}).get("step") == "human_mode":
+        if text == "結束客服":
+            user_states.pop(user_id, None)
+            reply(reply_token, "已返回 AI 助理模式 🤖\n有任何問題歡迎繼續詢問！")
+        # 真人模式中，其他訊息由後台客服人員回覆，Bot 不介入
+        return
+
     # ── 主題清單（行程/美食/交通主題）────────────────────────
     if theme_browse_handler.handle(user_id, text, reply_token, user_states, reply, push, reply_flex):
         return
@@ -169,9 +182,14 @@ def handle_postback(event):
 @app.route("/liff/flight")
 def liff_flight():
     """提供 LIFF 飛機查詢頁面，將 URL 中的 token 注入模板"""
-    liff_id = os.getenv("LIFF_ID", "")
-    token   = request.args.get("token", "")
-    return render_template("liff_flight.html", liff_id=liff_id, token=token)
+    from flask import make_response
+    liff_id  = os.getenv("LIFF_ID", "")
+    token    = request.args.get("token", "")
+    resp = make_response(render_template("liff_flight.html", liff_id=liff_id, token=token))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"]        = "no-cache"
+    resp.headers["Expires"]       = "0"
+    return resp
 
 
 @app.route("/api/flight-search", methods=["POST"])
@@ -186,35 +204,43 @@ def api_flight_search():
     data    = request.get_json(force=True)
     token   = data.get("token", "")
     user_id = resolve_liff_token(token) if token else None
-    departure  = data.get("departure")
-    dep_name   = data.get("dep_name", "")
-    date_str   = data.get("date")
-    ret_date   = data.get("ret_date", "")
-    passengers = int(data.get("passengers", 1))
-    infants    = int(data.get("infants", 0))
+    departure    = data.get("departure")
+    dep_name     = data.get("dep_name", "")
+    destination  = data.get("destination", "MZG")
+    dest_name    = data.get("dest_name", "澎湖")
+    date_str     = data.get("date")
+    ret_dep      = data.get("ret_dep", "")
+    ret_dep_name = data.get("ret_dep_name", "")
+    ret_arr      = data.get("ret_arr", "")
+    ret_arr_name = data.get("ret_arr_name", "")
+    ret_date     = data.get("ret_date", "")
+    passengers   = int(data.get("passengers", 1))
+    infants      = int(data.get("infants", 0))
 
-    if not user_id or not departure or not date_str:
+    if not user_id:
+        return jsonify({"error": "連結已過期，請關閉後重新點選飛機航班"}), 400
+    if not departure or not destination or not date_str:
         return jsonify({"error": "缺少必要參數"}), 400
 
-    print(f"[LIFF] user_id={user_id!r}  departure={departure}  date={date_str}")
+    print(f"[LIFF] user_id={user_id!r}  {departure}→{destination}  date={date_str}")
 
     def _search():
         from flex.flight_result import get_flight_result_flex
         try:
             # 去程
-            flights_out = search_flights(departure, "MZG", date_str, passengers, infants)
+            flights_out = search_flights(departure, destination, date_str, passengers, infants)
 
             # 來回
             flights_ret = None
-            if ret_date:
-                flights_ret = search_flights("MZG", departure, ret_date, passengers, infants)
+            if ret_date and ret_dep and ret_arr:
+                flights_ret = search_flights(ret_dep, ret_arr, ret_date, passengers, infants)
 
             flex_dict = get_flight_result_flex(
-                flights_out, dep_name, "澎湖", date_str,
+                flights_out, dep_name, dest_name, date_str,
                 flights_ret, ret_date or None
             )
 
-            alt = f"✈️ {dep_name}→澎湖 {date_str} 航班查詢結果"
+            alt = f"✈️ {dep_name}→{dest_name} {date_str} 航班查詢結果"
             push_flex(user_id, flex_dict, alt)
 
             if infants:

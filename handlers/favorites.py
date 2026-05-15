@@ -320,20 +320,23 @@ def handle_postback(user_id, data, reply_token, reply_fn, reply_flex_fn):
 
     # ── 確認詢價，寄 email 給負責人 ──
     elif action == "confirm_inquiry":
-        from services.email_service import send_inquiry_email
+        from services.email_service import send_inquiry_email, generate_order_no
         favorites = _get_favorites(user_id)
 
         if not favorites:
             reply_fn(reply_token, "收藏清單是空的，無法送出詢價。")
             return
 
-        # 先回覆使用者，接著背景寄信
-        reply_fn(reply_token, "✅ 已收到您的心願清單！\n我們的工作人員將儘速與您聯繫，請稍候。")
+        order_no = generate_order_no()
+        reply_fn(reply_token,
+                 f"✅ 已收到您的心願清單！\n"
+                 f"訂單編號：{order_no}\n\n"
+                 f"我們的工作人員將儘速與您聯繫，請稍候。")
 
         def _send():
             try:
-                send_inquiry_email(user_id, favorites)
-                print(f"[Email] 詢價通知已寄出，user_id={user_id!r}")
+                send_inquiry_email(order_no, favorites)
+                print(f"[Email] 詢價通知已寄出，order_no={order_no!r}")
             except Exception as e:
                 print(f"[Email] 寄送失敗：{e}")
 

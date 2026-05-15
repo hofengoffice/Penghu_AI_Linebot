@@ -12,8 +12,8 @@
 所有班次依出發時間排序，去程與回程在同一個 carousel 中呈現。
 """
 
-COLOR_OUTBOUND = "#4EADAC"   # 去程標頭顏色（藍綠）
-COLOR_RETURN   = "#E08840"   # 回程標頭顏色（橘）
+COLOR_MANDARIN = "#2B6CB0"   # 華信航空（藍）
+COLOR_UNIAIR   = "#2E8B3A"   # 立榮航空（綠）
 COLOR_OK       = "#00AA44"   # 有位
 COLOR_FULL     = "#CC3333"   # 售完
 
@@ -35,12 +35,12 @@ def get_flight_result_flex(outbound_flights, dep_name, arr_name, date_str,
 
     # ── 去程 ──
     for f in _sort_by_time(outbound_flights):
-        bubbles.append(_bubble(f, dep_name, arr_name, date_str, "去程", COLOR_OUTBOUND))
+        bubbles.append(_bubble(f, dep_name, arr_name, date_str, "去程"))
 
     # ── 回程 ──
     if return_flights and ret_date:
         for f in _sort_by_time(return_flights):
-            bubbles.append(_bubble(f, arr_name, dep_name, ret_date, "回程", COLOR_RETURN))
+            bubbles.append(_bubble(f, arr_name, dep_name, ret_date, "回程"))
 
     if not bubbles:
         return _empty_bubble(dep_name, arr_name, date_str)
@@ -59,9 +59,10 @@ def _sort_by_time(flights: list) -> list:
 
 
 def _bubble(flight: dict, dep_name: str, arr_name: str,
-            date_str: str, direction: str, header_color: str) -> dict:
+            date_str: str, direction: str) -> dict:
     airline   = flight.get("航空公司", "")
     flight_no = flight.get("航班", "")
+    header_color = COLOR_UNIAIR if "立榮" in airline else COLOR_MANDARIN
     dep_time  = (flight.get("起飛", "") or "")[:5]
     arr_time  = (flight.get("抵達", "") or "")[:5]
     status    = flight.get("狀態", "")

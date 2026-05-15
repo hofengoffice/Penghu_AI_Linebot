@@ -209,71 +209,82 @@ def _uniair_fill_form(driver, dep_name, arr_name, date_str, adult_count, infant_
         return False
 
 
-def _uniair_solve_captcha(driver):
+def _uniair_solve_captcha(driver, max_retries=3):
     """
     1. 定位驗證碼圖片並截圖
     2. 使用 OpenCV 放大 2 倍提高 AI 辨識率
     3. 辨識並填入，最後點擊搜尋
+    4. 若驗證碼錯誤（頁面未跳轉），自動刷新驗證碼重試，最多 max_retries 次
     """
     wait = WebDriverWait(driver, 15)
     ocr = ddddocr.DdddOcr(show_ad=False)
 
-    # 1. 定位圖片 (使用妳提供的絕對 XPath)
     target_xpath = "/html/body/form/div[2]/div[2]/div/div[2]/div[2]/div[4]/div/div/div/div[1]/img"
-    print("🕵️ 正在定位驗證碼圖片...")
+    btn_xpath    = "/html/body/form/div[2]/div[2]/div/div[2]/div[3]/div/div/a"
+    refresh_xpath = "//a[contains(@id,'RefreshCode') or contains(@onclick,'RefreshCode') or contains(@class,'refresh')]"
 
-    try:
-        # 找到元素並截圖
-        captcha_el = wait.until(EC.visibility_of_element_located((By.XPATH, target_xpath)))
-        img_bytes = captcha_el.screenshot_as_png
-
-        # 2. 影像處理：Bytes -> OpenCV -> 放大 2 倍
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        # 關鍵：fx=2, fy=2
-        img_resized = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
-
-        # 3. 交給 AI 辨識 (轉回 PIL 格式)
-        pil_img = Image.fromarray(cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB))
-        code = ocr.classification(pil_img).strip().upper()
-        print(f"🤖 AI 辨識結果：{code}")
-
-        # 4. 填入驗證碼
-        input_box = driver.find_element(By.CSS_SELECTOR, "input[id*='CaptchaCode']")
-        input_box.clear()
-        input_box.send_keys(code)
-
-        # 5. 強力點擊搜尋按鈕 (含備案機制)
-        print("🖱️ 正在點擊搜尋按鈕，前往航班頁面...")
-        btn_xpath = "/html/body/form/div[2]/div[2]/div/div[2]/div[3]/div/div/a"
-
+    for attempt in range(1, max_retries + 1):
+        print(f"🕵️ 正在定位驗證碼圖片... (第 {attempt}/{max_retries} 次)")
         try:
-            # 優先使用絕對路徑與 JS 點擊 (防止 null 錯誤)
-            submit_btn = wait.until(EC.element_to_be_clickable((By.XPATH, btn_xpath)))
-            driver.execute_script("arguments[0].click();", submit_btn)
-            print("🚀 搜尋按鈕已成功觸發！")
-        except:
-            # 備案：如果 XPath 換了，改用 ID
-            backup_btn = driver.find_element(By.ID, "CPH_Body_btn_SelectFlight")
-            driver.execute_script("arguments[0].click();", backup_btn)
-            print("🚀 備案 ID 點擊成功！")
+            # 1. 截圖驗證碼
+            captcha_el = wait.until(EC.visibility_of_element_located((By.XPATH, target_xpath)))
+            img_bytes  = captcha_el.screenshot_as_png
 
-        # 6. 驗證是否成功跳轉
-        print("⏳ 等待網頁跳轉中...")
-        time.sleep(5)
+            # 2. 影像處理：放大 2 倍
+            nparr      = np.frombuffer(img_bytes, np.uint8)
+            img        = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            img_resized = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
 
-        current_url = driver.current_url.lower()
-        if "select" in current_url and ".aspx" in current_url:
-            print("✨✨ 恭喜！網址確認已跳轉，準備擷取資料！ ✨✨")
-            return True
-        else:
-            print(f"⚠️ 偵測失敗，目前網址: {driver.current_url}")
-            return False
+            # 3. AI 辨識
+            pil_img = Image.fromarray(cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB))
+            code    = ocr.classification(pil_img).strip().upper()
+            print(f"🤖 AI 辨識結果：{code}")
 
-    except Exception as e:
-        driver.save_screenshot('error_captcha_locator.png')
-        print(f"❌ 執行出錯，請檢查 error_captcha_locator.png。錯誤：{e}")
-        return False
+            # 4. 填入驗證碼
+            input_box = driver.find_element(By.CSS_SELECTOR, "input[id*='CaptchaCode']")
+            input_box.clear()
+            input_box.send_keys(code)
+
+            # 5. 點擊搜尋按鈕
+            print("🖱️ 正在點擊搜尋按鈕，前往航班頁面...")
+            try:
+                submit_btn = wait.until(EC.element_to_be_clickable((By.XPATH, btn_xpath)))
+                driver.execute_script("arguments[0].click();", submit_btn)
+            except:
+                backup_btn = driver.find_element(By.ID, "CPH_Body_btn_SelectFlight")
+                driver.execute_script("arguments[0].click();", backup_btn)
+            print("🚀 搜尋按鈕已觸發！")
+
+            # 6. 等待跳轉
+            print("⏳ 等待網頁跳轉中...")
+            time.sleep(6)
+
+            current_url = driver.current_url.lower()
+            if "select" in current_url and ".aspx" in current_url:
+                print("✨ 網址已跳轉，準備擷取資料！")
+                return True
+
+            print(f"⚠️ 驗證碼錯誤或未跳轉，目前網址: {driver.current_url}")
+
+            # 7. 刷新驗證碼，準備重試
+            if attempt < max_retries:
+                try:
+                    refresh_btn = driver.find_element(By.XPATH, refresh_xpath)
+                    driver.execute_script("arguments[0].click();", refresh_btn)
+                    print("🔄 已刷新驗證碼，準備重試...")
+                    time.sleep(1)
+                except:
+                    # 找不到刷新按鈕，直接清空輸入框等頁面自動刷新
+                    print("🔄 找不到刷新按鈕，等待頁面重置...")
+                    time.sleep(2)
+
+        except Exception as e:
+            print(f"❌ 第 {attempt} 次執行出錯：{e}")
+            if attempt == max_retries:
+                driver.save_screenshot('error_captcha_locator.png')
+
+    print("❌ 驗證碼重試次數已達上限，放棄查詢")
+    return False
 
 
 def _uniair_capture_flights(driver, label="去程"):

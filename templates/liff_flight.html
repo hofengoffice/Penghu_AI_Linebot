@@ -26,7 +26,6 @@
             padding-bottom: 88px;
         }
 
-        /* ── Header ── */
         .header {
             background: var(--primary);
             color: white;
@@ -41,7 +40,6 @@
             gap: 8px;
         }
 
-        /* ── Card section ── */
         .section {
             background: var(--card);
             margin: 12px 12px 0;
@@ -58,7 +56,6 @@
             margin-bottom: 10px;
         }
 
-        /* ── Toggle buttons (行程類型) ── */
         .btn-group {
             display: flex;
             gap: 8px;
@@ -84,7 +81,6 @@
             font-weight: 700;
         }
 
-        /* ── City grid ── */
         .city-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -97,7 +93,7 @@
             border-radius: 8px;
             background: white;
             color: var(--text);
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             transition: border-color 0.15s, background 0.15s, color 0.15s;
@@ -110,7 +106,32 @@
             font-weight: 700;
         }
 
-        /* ── Date input ── */
+        .btn-city:disabled {
+            border-color: var(--border);
+            background: #f5f5f5;
+            color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 來回回程區塊 */
+        .return-block {
+            display: none;
+            margin-top: 0;
+        }
+        .return-block.visible { display: block; }
+
+        /* 路線箭頭標示 */
+        .route-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+        .route-label strong { color: var(--text); font-size: 15px; }
+
         .date-input {
             width: 100%;
             padding: 12px 14px;
@@ -122,12 +143,8 @@
             outline: none;
             transition: border-color 0.15s;
         }
+        .date-input:focus { border-color: var(--primary); }
 
-        .date-input:focus {
-            border-color: var(--primary);
-        }
-
-        /* ── Counter ── */
         .counter {
             display: flex;
             align-items: center;
@@ -151,16 +168,8 @@
             flex-shrink: 0;
         }
 
-        .btn-counter:active {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-counter:disabled {
-            border-color: var(--border);
-            color: var(--border);
-            cursor: not-allowed;
-        }
+        .btn-counter:active { background: var(--primary); color: white; }
+        .btn-counter:disabled { border-color: var(--border); color: var(--border); cursor: not-allowed; }
 
         .counter-value {
             font-size: 26px;
@@ -169,37 +178,11 @@
             text-align: center;
         }
 
-        .counter-unit {
-            font-size: 14px;
-            color: var(--muted);
-        }
+        .counter-unit { font-size: 14px; color: var(--muted); }
 
-        /* ── Destination fixed row ── */
-        .dest-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .dest-value {
-            font-weight: 700;
-            font-size: 15px;
-        }
-
-        /* ── Collapsible return section ── */
-        #ret-section {
-            display: none;
-        }
-        #ret-section.visible {
-            display: block;
-        }
-
-        /* ── Submit bar ── */
         .submit-bar {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: 0; left: 0; right: 0;
             padding: 12px 16px 16px;
             background: white;
             border-top: 1px solid var(--border);
@@ -221,7 +204,6 @@
         .btn-submit:active  { background: var(--primary-dark); }
         .btn-submit:disabled { background: #ccc; cursor: not-allowed; }
 
-        /* ── Toast ── */
         .toast {
             position: fixed;
             bottom: 88px;
@@ -243,7 +225,6 @@
 </head>
 <body>
 
-<!-- Header -->
 <div class="header">✈️ 飛機航班查詢</div>
 
 <!-- 行程類型 -->
@@ -255,31 +236,70 @@
     </div>
 </div>
 
-<!-- 出發城市 -->
+<!-- ── 地點 ── -->
 <div class="section">
-    <div class="section-title">出發城市</div>
-    <div class="city-grid">
-        <button class="btn-city" onclick="setCity('TSA','台北',this)">台北（松山）</button>
-        <button class="btn-city" onclick="setCity('RMQ','台中',this)">台中</button>
-        <button class="btn-city" onclick="setCity('CYI','嘉義',this)">嘉義</button>
-        <button class="btn-city" onclick="setCity('KHH','高雄',this)">高雄</button>
+    <div class="section-title">去程｜出發城市</div>
+    <div class="city-grid" id="dep-grid">
+        <button class="btn-city" data-code="TSA" onclick="setDep('TSA','台北',this)">台北（松山）</button>
+        <button class="btn-city" data-code="RMQ" onclick="setDep('RMQ','台中',this)">台中</button>
+        <button class="btn-city" data-code="CYI" onclick="setDep('CYI','嘉義',this)">嘉義</button>
+        <button class="btn-city" data-code="KHH" onclick="setDep('KHH','高雄',this)">高雄</button>
+        <button class="btn-city" data-code="MZG" onclick="setDep('MZG','澎湖',this)">澎湖</button>
+    </div>
+
+    <div style="border-top:1px solid var(--border); margin: 14px 0;"></div>
+
+    <div class="section-title">去程｜目的城市</div>
+    <div class="city-grid" id="arr-grid">
+        <button class="btn-city" data-code="TSA" onclick="setArr('TSA','台北',this)">台北（松山）</button>
+        <button class="btn-city" data-code="RMQ" onclick="setArr('RMQ','台中',this)">台中</button>
+        <button class="btn-city" data-code="CYI" onclick="setArr('CYI','嘉義',this)">嘉義</button>
+        <button class="btn-city" data-code="KHH" onclick="setArr('KHH','高雄',this)">高雄</button>
+        <button class="btn-city" data-code="MZG" onclick="setArr('MZG','澎湖',this)">澎湖</button>
+    </div>
+
+    <!-- 回程地點（來回才顯示） -->
+    <div class="return-block" id="return-city-block">
+        <div style="border-top:1px solid var(--border); margin: 14px 0;"></div>
+
+        <div class="section-title">回程｜出發城市</div>
+        <div class="route-label">依去程自動填入，可自行調整</div>
+        <div class="city-grid" id="ret-dep-grid">
+            <button class="btn-city" data-code="TSA" onclick="setRetDep('TSA','台北',this)">台北（松山）</button>
+            <button class="btn-city" data-code="RMQ" onclick="setRetDep('RMQ','台中',this)">台中</button>
+            <button class="btn-city" data-code="CYI" onclick="setRetDep('CYI','嘉義',this)">嘉義</button>
+            <button class="btn-city" data-code="KHH" onclick="setRetDep('KHH','高雄',this)">高雄</button>
+            <button class="btn-city" data-code="MZG" onclick="setRetDep('MZG','澎湖',this)">澎湖</button>
+        </div>
+
+        <div style="border-top:1px solid var(--border); margin: 14px 0;"></div>
+
+        <div class="section-title">回程｜目的城市</div>
+        <div class="city-grid" id="ret-arr-grid">
+            <button class="btn-city" data-code="TSA" onclick="setRetArr('TSA','台北',this)">台北（松山）</button>
+            <button class="btn-city" data-code="RMQ" onclick="setRetArr('RMQ','台中',this)">台中</button>
+            <button class="btn-city" data-code="CYI" onclick="setRetArr('CYI','嘉義',this)">嘉義</button>
+            <button class="btn-city" data-code="KHH" onclick="setRetArr('KHH','高雄',this)">高雄</button>
+            <button class="btn-city" data-code="MZG" onclick="setRetArr('MZG','澎湖',this)">澎湖</button>
+        </div>
     </div>
 </div>
 
-<!-- 出發日期 -->
+<!-- ── 日期 ── -->
 <div class="section">
-    <div class="section-title">出發日期</div>
+    <div class="section-title">去程｜出發日期</div>
     <input type="date" id="dep-date" class="date-input">
+
+    <!-- 回程日期（來回才顯示） -->
+    <div class="return-block" id="return-date-block">
+        <div style="border-top:1px solid var(--border); margin: 14px 0;"></div>
+        <div class="section-title">回程｜日期</div>
+        <input type="date" id="ret-date" class="date-input">
+    </div>
 </div>
 
-<!-- 回程日期（來回才顯示） -->
-<div class="section" id="ret-section">
-    <div class="section-title">回程日期</div>
-    <input type="date" id="ret-date" class="date-input">
-</div>
-
-<!-- 旅客人數 -->
-<div class="section">
+<!-- ── 人數 ── -->
+<div class="section" style="margin-bottom:12px;">
     <div class="section-title">旅客（2歲以上）</div>
     <div class="counter">
         <button class="btn-counter" id="pax-dec" onclick="adjust('pax',-1)">－</button>
@@ -287,24 +307,15 @@
         <button class="btn-counter" id="pax-inc" onclick="adjust('pax',+1)">＋</button>
         <span class="counter-unit">&nbsp;人</span>
     </div>
-</div>
 
-<!-- 嬰兒人數 -->
-<div class="section">
+    <div style="border-top:1px solid var(--border); margin: 14px 0;"></div>
+
     <div class="section-title">嬰兒（未滿2歲）</div>
     <div class="counter">
         <button class="btn-counter" id="inf-dec" onclick="adjust('inf',-1)">－</button>
         <span class="counter-value" id="inf-val">0</span>
         <button class="btn-counter" id="inf-inc" onclick="adjust('inf',+1)">＋</button>
         <span class="counter-unit">&nbsp;人</span>
-    </div>
-</div>
-
-<!-- 目的地（固定） -->
-<div class="section" style="margin-bottom:12px;">
-    <div class="dest-row">
-        <span class="section-title" style="margin:0;">目的地</span>
-        <span class="dest-value">澎湖 🔒</span>
     </div>
 </div>
 
@@ -316,29 +327,32 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────
+const CITIES = [
+    { code: 'TSA', name: '台北' },
+    { code: 'RMQ', name: '台中' },
+    { code: 'CYI', name: '嘉義' },
+    { code: 'KHH', name: '高雄' },
+    { code: 'MZG', name: '澎湖' },
+];
+
 const state = {
-    tripType:   'one_way',
-    departure:  null,
-    depName:    null,
-    date:       null,
-    retDate:    null,
-    passengers: 1,
-    infants:    0
+    tripType:    'one_way',
+    departure:   null, depName:    null,
+    destination: null, destName:   null,
+    date:        null,
+    retDep:      null, retDepName: null,
+    retArr:      null, retArrName: null,
+    retDate:     null,
+    passengers:  1,
+    infants:     0
 };
 
-// token 由 Flask 注入，用來在 server 換回正確的 user_id
 const SESSION_TOKEN = '{{ token }}';
 
-// ── LIFF 初始化 ────────────────────────────────────────────────
+// ── LIFF 初始化 ──────────────────────────────────────────────
 (async () => {
-    try {
-        await liff.init({ liffId: '{{ liff_id }}' });
-    } catch (e) {
-        console.error('LIFF init error:', e);
-    }
+    try { await liff.init({ liffId: '{{ liff_id }}' }); } catch (e) {}
 
-    // 設定最小日期為今天
     const today = new Date().toISOString().split('T')[0];
     const depEl = document.getElementById('dep-date');
     const retEl = document.getElementById('ret-date');
@@ -349,7 +363,7 @@ const SESSION_TOKEN = '{{ token }}';
 
     depEl.addEventListener('change', e => {
         state.date = e.target.value.replace(/-/g, '/');
-        retEl.min = e.target.value;          // 回程不能早於去程
+        retEl.min = e.target.value;
         if (retEl.value && retEl.value < e.target.value) {
             retEl.value = e.target.value;
             state.retDate = state.date;
@@ -362,31 +376,104 @@ const SESSION_TOKEN = '{{ token }}';
     refreshCounterBtns();
 })();
 
-// ── 行程類型 ───────────────────────────────────────────────────
+// ── 行程類型 ─────────────────────────────────────────────────
 function setTripType(type, btn) {
     state.tripType = type;
     document.querySelectorAll('.btn-toggle').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
-    const retSec = document.getElementById('ret-section');
-    if (type === 'round_trip') {
-        retSec.classList.add('visible');
+    const show = type === 'round_trip';
+    document.getElementById('return-city-block').classList.toggle('visible', show);
+    document.getElementById('return-date-block').classList.toggle('visible', show);
+
+    if (show) {
+        if (state.destination && !state.retDep) autoFillReturn();
     } else {
-        retSec.classList.remove('visible');
-        state.retDate = null;
+        state.retDep = state.retDepName = state.retArr = state.retArrName = state.retDate = null;
         document.getElementById('ret-date').value = '';
+        highlightGrid('ret-dep-grid', null);
+        highlightGrid('ret-arr-grid', null);
     }
 }
 
-// ── 城市選擇 ───────────────────────────────────────────────────
-function setCity(code, name, btn) {
+// ── 去程城市 ─────────────────────────────────────────────────
+function setDep(code, name, btn) {
     state.departure = code;
     state.depName   = name;
-    document.querySelectorAll('.btn-city').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    highlightGrid('dep-grid', code);
+    // 若目的地與出發地相同，清空目的地
+    if (state.destination === code) {
+        state.destination = state.destName = null;
+        highlightGrid('arr-grid', null);
+    }
+    disableSameCity('arr-grid', code);
+    if (state.tripType === 'round_trip') autoFillReturn();
 }
 
-// ── 人數加減 ───────────────────────────────────────────────────
+function setArr(code, name, btn) {
+    state.destination = code;
+    state.destName    = name;
+    highlightGrid('arr-grid', code);
+    // 若出發地與目的地相同，清空出發地
+    if (state.departure === code) {
+        state.departure = state.depName = null;
+        highlightGrid('dep-grid', null);
+    }
+    disableSameCity('dep-grid', code);
+    if (state.tripType === 'round_trip') autoFillReturn();
+}
+
+// ── 回程城市 ─────────────────────────────────────────────────
+function setRetDep(code, name, btn) {
+    state.retDep    = code;
+    state.retDepName = name;
+    highlightGrid('ret-dep-grid', code);
+    if (state.retArr === code) {
+        state.retArr = state.retArrName = null;
+        highlightGrid('ret-arr-grid', null);
+    }
+    disableSameCity('ret-arr-grid', code);
+}
+
+function setRetArr(code, name, btn) {
+    state.retArr    = code;
+    state.retArrName = name;
+    highlightGrid('ret-arr-grid', code);
+    if (state.retDep === code) {
+        state.retDep = state.retDepName = null;
+        highlightGrid('ret-dep-grid', null);
+    }
+    disableSameCity('ret-dep-grid', code);
+}
+
+// ── 自動填入回程（去程反向）────────────────────────────────────
+function autoFillReturn() {
+    if (!state.destination || !state.departure) return;
+    // 回程：目的地 → 出發地
+    state.retDep    = state.destination;
+    state.retDepName = state.destName;
+    state.retArr    = state.departure;
+    state.retArrName = state.depName;
+    highlightGrid('ret-dep-grid', state.retDep);
+    highlightGrid('ret-arr-grid', state.retArr);
+    disableSameCity('ret-arr-grid', state.retDep);
+    disableSameCity('ret-dep-grid', state.retArr);
+}
+
+// ── 工具函式 ─────────────────────────────────────────────────
+function highlightGrid(gridId, activeCode) {
+    document.querySelectorAll(`#${gridId} .btn-city`).forEach(b => {
+        b.classList.toggle('active', b.dataset.code === activeCode);
+    });
+}
+
+function disableSameCity(gridId, disableCode) {
+    document.querySelectorAll(`#${gridId} .btn-city`).forEach(b => {
+        b.disabled = (b.dataset.code === disableCode);
+    });
+}
+
+// ── 人數加減 ─────────────────────────────────────────────────
 function adjust(type, delta) {
     if (type === 'pax') {
         state.passengers = Math.max(1, Math.min(9, state.passengers + delta));
@@ -407,7 +494,7 @@ function refreshCounterBtns() {
     document.getElementById('inf-inc').disabled = state.infants >= state.passengers;
 }
 
-// ── Toast ──────────────────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────
 let toastTimer = null;
 function showToast(msg) {
     const el = document.getElementById('toast');
@@ -417,12 +504,15 @@ function showToast(msg) {
     toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
-// ── 送出查詢 ───────────────────────────────────────────────────
+// ── 送出查詢 ─────────────────────────────────────────────────
 async function submitForm() {
-    if (!state.departure)               { showToast('❌ 請選擇出發城市'); return; }
-    if (!state.date)                    { showToast('❌ 請選擇出發日期'); return; }
-    if (state.tripType === 'round_trip' && !state.retDate) {
-        showToast('❌ 來回行程請選擇回程日期'); return;
+    if (!state.departure)   { showToast('❌ 請選擇出發城市'); return; }
+    if (!state.destination) { showToast('❌ 請選擇目的城市'); return; }
+    if (!state.date)        { showToast('❌ 請選擇出發日期'); return; }
+    if (state.tripType === 'round_trip') {
+        if (!state.retDep)  { showToast('❌ 請選擇回程出發城市'); return; }
+        if (!state.retArr)  { showToast('❌ 請選擇回程目的城市'); return; }
+        if (!state.retDate) { showToast('❌ 請選擇回程日期'); return; }
     }
 
     const btn = document.getElementById('submit-btn');
@@ -430,22 +520,32 @@ async function submitForm() {
     btn.textContent = '查詢中，請稍候...';
 
     try {
-        const res = await fetch('/api/flight-search', {
+        const apiUrl = window.location.origin + '/api/flight-search';
+        const res = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                token:      SESSION_TOKEN,
-                trip_type:  state.tripType,
-                departure:  state.departure,
-                dep_name:   state.depName,
-                date:       state.date,
-                ret_date:   state.retDate || '',
-                passengers: state.passengers,
-                infants:    state.infants
+                token:        SESSION_TOKEN,
+                trip_type:    state.tripType,
+                departure:    state.departure,
+                dep_name:     state.depName,
+                destination:  state.destination,
+                dest_name:    state.destName,
+                date:         state.date,
+                ret_dep:      state.retDep     || '',
+                ret_dep_name: state.retDepName || '',
+                ret_arr:      state.retArr     || '',
+                ret_arr_name: state.retArrName || '',
+                ret_date:     state.retDate    || '',
+                passengers:   state.passengers,
+                infants:      state.infants
             })
         });
 
-        if (!res.ok) throw new Error('server error');
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
 
         btn.textContent = '✅ 查詢已送出，稍後將推送結果';
         setTimeout(() => liff.closeWindow(), 1800);
@@ -453,7 +553,7 @@ async function submitForm() {
     } catch (e) {
         btn.disabled = false;
         btn.textContent = '🔍 查詢航班';
-        showToast('⚠️ 送出失敗，請重試');
+        showToast(`⚠️ ${e.message || '送出失敗，請重試'}`);
     }
 }
 </script>

@@ -23,11 +23,14 @@ def create(user_id: str, ttl_minutes: int = 30) -> str:
 
 def resolve(token: str) -> str | None:
     """
-    以 token 換回 user_id（一次性使用，用後即刪）。
+    以 token 換回 user_id（有效期內可重複使用）。
     token 不存在或已過期則回傳 None。
     """
-    entry = _store.pop(token, None)
+    entry = _store.get(token)
     if not entry:
         return None
     user_id, expiry = entry
-    return user_id if datetime.now() <= expiry else None
+    if datetime.now() > expiry:
+        _store.pop(token, None)
+        return None
+    return user_id
