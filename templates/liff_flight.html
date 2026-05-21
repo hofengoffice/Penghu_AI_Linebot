@@ -321,6 +321,10 @@
         <button class="btn-counter" id="inf-inc" onclick="adjust('inf',+1)">＋</button>
         <span class="counter-unit">&nbsp;人</span>
     </div>
+
+    <div style="margin-top:10px; font-size:12px; color:var(--muted);">
+        ℹ️ 旅客、嬰兒各最多 4 人，嬰兒數不可超過旅客數
+    </div>
 </div>
 
 <!-- 送出 -->
@@ -478,14 +482,17 @@ function disableSameCity(gridId, disableCode) {
 }
 
 // ── 人數加減 ─────────────────────────────────────────────────
+const MAX_PAX = 4;
+const MAX_INF = 4;
+
 function adjust(type, delta) {
     if (type === 'pax') {
-        state.passengers = Math.max(1, Math.min(9, state.passengers + delta));
-        state.infants    = Math.min(state.infants, state.passengers);
+        state.passengers = Math.max(1, Math.min(MAX_PAX, state.passengers + delta));
+        state.infants    = Math.min(state.infants, state.passengers, MAX_INF);
         document.getElementById('pax-val').textContent = state.passengers;
         document.getElementById('inf-val').textContent = state.infants;
     } else {
-        state.infants = Math.max(0, Math.min(state.passengers, state.infants + delta));
+        state.infants = Math.max(0, Math.min(state.passengers, MAX_INF, state.infants + delta));
         document.getElementById('inf-val').textContent = state.infants;
     }
     refreshCounterBtns();
@@ -493,9 +500,9 @@ function adjust(type, delta) {
 
 function refreshCounterBtns() {
     document.getElementById('pax-dec').disabled = state.passengers <= 1;
-    document.getElementById('pax-inc').disabled = state.passengers >= 9;
+    document.getElementById('pax-inc').disabled = state.passengers >= MAX_PAX;
     document.getElementById('inf-dec').disabled = state.infants <= 0;
-    document.getElementById('inf-inc').disabled = state.infants >= state.passengers;
+    document.getElementById('inf-inc').disabled = state.infants >= state.passengers || state.infants >= MAX_INF;
 }
 
 // ── Toast ────────────────────────────────────────────────────

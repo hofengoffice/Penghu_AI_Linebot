@@ -9,6 +9,7 @@ __pycache__/
 # 暫時保留、尚未整合的舊資料夾
 information/
 Panghu_AI_Leader/
+Penghu-Travel-AI-Assistant/
 
 # 使用者資料
 storage/favorites/
