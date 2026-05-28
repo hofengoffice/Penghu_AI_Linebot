@@ -15,7 +15,8 @@ from linebot.v3.messaging import (
     ApiClient, Configuration, MessagingApi,
     ReplyMessageRequest, PushMessageRequest,
     TextMessage as TextMsg,
-    FlexMessage, FlexContainer
+    FlexMessage, FlexContainer,
+    QuickReply, QuickReplyItem, PostbackAction
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent, PostbackEvent
 from dotenv import load_dotenv
@@ -87,6 +88,33 @@ def reply_flex(reply_token, flex_dict, alt_text="選單"):
             )
         )
 
+def reply_quick_reply(reply_token, text, options):
+    """回覆帶有 Quick Reply 按鈕的文字訊息。
+    options: [(label, postback_data), ...]
+    """
+    with ApiClient(configuration) as api_client:
+        MessagingApi(api_client).reply_message(
+            ReplyMessageRequest(
+                reply_token=reply_token,
+                messages=[
+                    TextMsg(
+                        type="text",
+                        text=text,
+                        quick_reply=QuickReply(items=[
+                            QuickReplyItem(
+                                action=PostbackAction(
+                                    label=label,
+                                    data=data,
+                                    display_text=label
+                                )
+                            )
+                            for label, data in options
+                        ])
+                    )
+                ]
+            )
+        )
+
 
 def handle_message(user_id, text, reply_token):
     """
@@ -140,7 +168,7 @@ def handle_message(user_id, text, reply_token):
         return
 
     # ── 空房查詢 ──────────────────────────────────────────
-    if room_query_handler.handle(user_id, text, reply_token, user_states, reply, push, reply_flex):
+    if room_query_handler.handle(user_id, text, reply_token, user_states, reply, push, reply_flex, reply_quick_reply):
         return
 
     # ── 交通查詢 ──────────────────────────────────────────
@@ -187,10 +215,17 @@ def handle_postback(event):
     if hasattr(event.postback, "params") and event.postback.params:
         date_param = event.postback.params.get("date")
 
-    # 飛機表單 postback
+    # 交通查詢 postback（飛機表單 + 其他交通加入清單）
     if transport_query_handler.handle_postback(
         user_id, data, date_param, reply_token, user_states,
-        reply, push, reply_flex
+        reply, push, reply_flex, reply_quick_reply
+    ):
+        return
+
+    # 空房預定 postback
+    if room_query_handler.handle_postback(
+        user_id, data, date_param, reply_token, user_states,
+        reply, reply_quick_reply, reply_flex
     ):
         return
 

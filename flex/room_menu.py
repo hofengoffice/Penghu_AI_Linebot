@@ -53,7 +53,7 @@ def get_room_menu():
                         },
                         {
                             "type": "text",
-                            "text": "❓ 常見問題 → 一次搞懂所有細節",
+                            "text": "📋 房間預定 → 填入日期、人數、備註",
                             "size": "sm",
                             "wrap": True
                         }
@@ -109,8 +109,8 @@ def get_room_menu():
                     "style": "secondary",
                     "action": {
                         "type": "message",
-                        "label": "❓ 常見問題",
-                        "text": "常見問題"
+                        "label": "📋 房間預定",
+                        "text": "房間預定"
                     }
                 }
             ]

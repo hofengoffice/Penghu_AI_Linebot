@@ -19,13 +19,24 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
+ITINERARIES_DIR = os.path.join(os.path.dirname(__file__), "..", "storage", "itineraries")
+
 # 分類名稱對照
 _CAT_LABEL = {
     "trip":          "🗺️ 熱門行程",
     "itinerary":     "🗺️ AI 規劃行程",
-    "transport":     "✈️ 交通（航班）",
+    "transport":     "✈️ 交通",
     "accommodation": "🏨 住宿",
 }
+
+
+def _load_itinerary(item_id: str) -> str:
+    """讀取 AI 行程文字內容，找不到回傳空字串"""
+    path = os.path.join(ITINERARIES_DIR, f"{item_id}.txt")
+    if not os.path.exists(path):
+        return ""
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read().strip()
 
 
 def _build_email_body(order_no: str, favorites: list) -> str:
@@ -55,6 +66,25 @@ def _build_email_body(order_no: str, favorites: list) -> str:
             for item in items:
                 name = item.get("name", "（未命名）")
                 lines.append(f"  • {name}")
+
+                # 住宿：附上入住/退房/備註
+                if t == "accommodation":
+                    if item.get("checkin"):
+                        lines.append(f"    入住：{item['checkin']}  退房：{item.get('checkout', '—')}")
+                    if item.get("pax"):
+                        lines.append(f"    人數：{item['pax']} 人")
+                    if item.get("note") and item["note"] != "無備註":
+                        lines.append(f"    備註：{item['note']}")
+
+                # AI 行程：附上完整行程內容
+                if t == "itinerary":
+                    content = _load_itinerary(item.get("id", ""))
+                    if content:
+                        lines.append("")
+                        lines.append("    ┌── AI 行程內容 ──────────────")
+                        for row in content.splitlines():
+                            lines.append(f"    │ {row}")
+                        lines.append("    └─────────────────────────────")
 
     lines += [
         "",
