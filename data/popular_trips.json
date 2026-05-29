@@ -89,6 +89,14 @@
       "days": 2,
       "spots": ["桶盤玄武岩浮潛", "虎井嶼潛水", "望安海龜生態", "七美珊瑚礁"],
       "image": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+    },
+    {
+      "id": "sea_4",
+      "name": "七美跳島海洋兩日遊",
+      "days": 2,
+      "spots": ["桶盤玄武岩浮潛", "虎井嶼潛水", "望安海龜生態", "七美珊瑚礁"],
+      "image": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
     }
+
   ]
 }
