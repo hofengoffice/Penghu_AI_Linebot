@@ -18,7 +18,7 @@ from linebot.v3.messaging import (
     FlexMessage, FlexContainer,
     QuickReply, QuickReplyItem, PostbackAction
 )
-from linebot.v3.webhooks import MessageEvent, TextMessageContent, PostbackEvent
+from linebot.v3.webhooks import MessageEvent, TextMessageContent, PostbackEvent, FollowEvent
 from dotenv import load_dotenv
 import handlers.smart_query as smart_query_handler
 import handlers.transport_query as transport_query_handler
@@ -146,12 +146,14 @@ def handle_message(user_id, text, reply_token):
               "🚌 交通主題　　→ 輸入「交通主題」\n"
               "✈️ 航班查詢　　→ 輸入「航班查詢」\n"
               "🏨 空房查詢　　→ 輸入「空房查詢」\n"
-              "🤖 智慧行程規劃→ 輸入「智慧查詢」\n"
-              "❤️ 我的收藏　　→ 輸入「我的收藏」\n"
+              "🤖 智慧行程規劃→ 輸入「亮亮排行程」\n"
+              "❤️ 收藏清單　　→ 輸入「收藏清單」\n"
               "─────────────────\n"
               "👨‍💼 真人客服\n"
-              "輸入「真人」即可轉接真人客服\n"
-              "輸入「結束客服」返回 AI 助理"
+              "輸入「真人」　　→ 轉接真人客服\n"
+              "輸入「結束客服」→ 返回 AI 助理\n"
+              "─────────────────\n"
+              "輸入「說明」可隨時查看此清單"
         )
         return
 
@@ -190,6 +192,23 @@ def callback():
     except InvalidSignatureError:
         abort(400)
     return "OK"
+
+
+@handler.add(FollowEvent)
+def handle_follow(event):
+    """用戶第一次加入官方帳號時，推送歡迎訊息"""
+    user_id = event.source.user_id
+    push(user_id,
+         "🌊 歡迎來到澎湖旅遊 AI 助理！\n\n"
+         "我可以幫你：\n"
+         "✈️ 查詢航班　　→ 輸入「航班查詢」\n"
+         "🤖 規劃行程　　→ 輸入「亮亮排行程」\n"
+         "🏨 預定住宿　　→ 輸入「空房查詢」\n"
+         "🗺️ 瀏覽主題　　→ 輸入「行程主題」\n"
+         "❤️ 查看收藏　　→ 輸入「收藏清單」\n\n"
+         "👨‍💼 需要真人服務？輸入「真人」即可轉接\n"
+         "📖 想查看全部功能？輸入「說明」"
+    )
 
 
 @handler.add(MessageEvent, message=TextMessageContent)

@@ -55,7 +55,7 @@ def handle(user_id, text, reply_token, user_states, reply_fn, push_fn, push_flex
     step = state.get("step", "start")
 
     # ── Step 1：使用者點選「智慧查詢」────────────────────
-    if text == "智慧查詢":
+    if text == "亮亮排行程":
         user_states[user_id] = {"step": "smart_query_input"}
         reply_fn(reply_token, "🤖 請輸入你的需求，例如：\n「喜歡吃海鮮、玩水，規劃三天兩夜」")
         return True
