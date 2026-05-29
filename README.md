@@ -239,8 +239,7 @@ LIFF_ID=your_liff_id
 
 # AI / RAG
 MISTRAL_API_KEY=your_mistral_key
-GEMINI_API_KEY=your_gemini_key
-HUGGINGFACE_HUB_TOKEN=your_hf_token
+HUGGINGFACE_HUB_TOKEN=your_hf_token   # 用於載入 EmbeddingGemma-300m Embedding 模型
 
 # 氣象局
 OPENDATA_CWA_API_KEY=your_cwa_key
@@ -258,6 +257,57 @@ NOTIFY_EMAIL=responsible@example.com
 1. Google 帳戶 → **安全性** → 開啟**兩步驟驗證**
 2. 安全性 → **應用程式密碼** → 選「郵件」→ 產生
 3. 將 16 位數密碼填入 `SMTP_PASS`
+
+---
+
+## LIFF 設定（LINE Login Channel）
+
+> LINE 目前**不再支援**在 Messaging API Channel 內直接建立 LIFF，
+> 必須另外建立 **LINE Login Channel**，再於該 Channel 下新增 LIFF App。
+
+### Step 1：建立 LINE Login Channel
+
+1. 前往 [LINE Developers Console](https://developers.line.biz/console/)
+2. 選擇與 Bot 相同的 **Provider**
+3. 點擊「**Create a new channel**」→ 選擇 **LINE Login**
+4. 填入以下資訊：
+   - Channel name：任意名稱（例如 `澎湖Bot LIFF`）
+   - Channel description：任意
+   - App types：勾選 **Web app**
+5. 同意條款 → **Create**
+
+### Step 2：建立 LIFF App
+
+1. 進入剛建立的 LINE Login Channel
+2. 點選上方「**LIFF**」分頁 → 「**Add**」
+3. 填入：
+   | 欄位 | 值 |
+   |------|----|
+   | LIFF app name | `航班查詢` |
+   | Size | **Full** |
+   | Endpoint URL | `https://你的網域/liff/flight`（本機測試填 ngrok URL） |
+   | Scope | 勾選 `openid`、`profile` |
+   | Bot link feature | **On (Aggressive)** → 選擇你的 Messaging API Channel |
+4. 點擊「**Add**」→ 複製顯示的 **LIFF ID**（格式：`1234567890-xxxxxxxx`）
+
+### Step 3：連結 Messaging API Channel
+
+1. 進入 LINE Login Channel → 「**Basic settings**」分頁
+2. 找到「**Linked Messaging API channel**」→ 點「**Link**」
+3. 選擇你的 Messaging API Channel → 確認連結
+
+### Step 4：填入環境變數
+
+```env
+LIFF_ID=1234567890-xxxxxxxx   # 貼上 Step 2 複製的 LIFF ID
+```
+
+### 本機測試（ngrok）
+
+每次重啟 ngrok 網址會改變，需同步更新兩處：
+
+1. **LINE Developers Console** → LINE Login Channel → LIFF → 編輯 Endpoint URL
+2. **LINE Developers Console** → Messaging API Channel → Webhook URL
 
 ---
 
@@ -345,27 +395,3 @@ https://xxxx.ngrok-free.app/liff/flight
 
 - `create(user_id, ttl_minutes=30)` → bot 側產生隨機 token 注入 LIFF URL
 - `resolve(token)` → LIFF 提交時帶 token 換回正確 user_id，一次性使用後自動刪除
-
----
-
-## 待開發項目
-
-- [x] `services/rag_service.py` — RAG 智慧查詢核心
-- [x] `handlers/smart_query.py` — 智慧查詢對話流程（含 AI 行程收藏）
-- [x] `rag/build_faiss.py` — 向量資料庫建立腳本
-- [x] `handlers/transport_query.py` — LIFF 航班入口 + 島內交通
-- [x] `services/airline_service.py` — 華信 + 立榮航空並行爬蟲
-- [x] `flex/flight_result.py` — 航班結果 Flex carousel（含收藏按鈕）
-- [x] `utils/liff_token.py` — Session token 機制
-- [x] `templates/liff_flight.html` — LIFF 航班查詢互動表單
-- [x] `handlers/popular_trip.py` — 熱門行程展示
-- [x] `flex/trip_card.py` — 行程類型輪播卡片
-- [x] `flex/trip_detail.py` — 行程詳細卡片（含收藏/取消收藏）
-- [x] `handlers/favorites.py` — 收藏清單 CRUD + 確認詢價
-- [x] `services/email_service.py` — 心願清單詢價 email 通知
-- [x] `flex/theme_trip.py` — 行程主題 carousel
-- [x] `flex/theme_food.py` — 美食主題 carousel
-- [x] `flex/theme_transport.py` — 交通主題 carousel
-- [ ] `handlers/room_query.py` — 空房查詢流程
-- [ ] `data/hotels.json` — 飯店資訊填入
-- [ ] `data/popular_trips.json` — 替換為正式行程資料

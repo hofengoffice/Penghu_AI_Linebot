@@ -28,3 +28,6 @@ Pillow==11.2.1
 
 # 環境變數
 python-dotenv==1.0.0
+
+# 部署（Render）
+gunicorn==22.0.0
