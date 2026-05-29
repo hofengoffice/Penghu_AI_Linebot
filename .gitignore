@@ -10,11 +10,14 @@ __pycache__/
 information/
 Penghu-Travel-AI-Assistant/
 
-# Panghu_AI_Leader 原始碼忽略（含硬編碼路徑），但 FAISS 向量庫需要納入版控
+# Panghu_AI_Leader 原始碼忽略（含硬編碼路徑），FAISS 向量庫已納入版控
 Panghu_AI_Leader/*
 !Panghu_AI_Leader/faiss_schedule_db/
+!Panghu_AI_Leader/faiss_schedule_db/**
 !Panghu_AI_Leader/faiss_scenery_db/
+!Panghu_AI_Leader/faiss_scenery_db/**
 !Panghu_AI_Leader/faiss_souvenir_db/
+!Panghu_AI_Leader/faiss_souvenir_db/**
 
 # 使用者資料
 storage/favorites/
