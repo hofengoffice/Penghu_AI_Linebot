@@ -3,7 +3,7 @@ services:
     name: penghu-linebot
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --timeout 120 --workers 1
+    startCommand: gunicorn app:app --timeout 120 --workers 1 --bind 0.0.0.0:$PORT
     nativePackages:
       - chromium
       - chromium-driver
