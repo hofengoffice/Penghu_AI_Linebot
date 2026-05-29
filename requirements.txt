@@ -23,7 +23,7 @@ webdriver-manager==4.0.2
 # 立榮驗證碼辨識
 ddddocr==1.6.1
 opencv-python-headless==4.11.0.86
-numpy==1.26.4
+numpy>=1.26.4
 Pillow==11.2.1
 
 # 環境變數
