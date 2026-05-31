@@ -182,6 +182,12 @@ def handle_message(user_id, text, reply_token):
         return
 
 
+#給 cron job ping 用
+@app.route("/health")
+def health():
+    return "OK", 200
+
+
 @app.route("/callback", methods=["POST"])
 def callback():
     """LINE Webhook 入口，驗證簽名後交給 handler 處理"""
