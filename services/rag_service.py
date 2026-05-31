@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta, date
 from dotenv import load_dotenv
-import aisuite as ai
+from mistralai import Mistral
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 
@@ -55,8 +55,8 @@ api_key = os.getenv("MISTRAL_API_KEY")
 if api_key is None:
     raise ValueError("MISTRAL_API_KEY environment variable is not set.")
 
-provider = "mistral"
-model    = "ministral-8b-latest"
+model = "ministral-8b-latest"
+_mistral_client = Mistral(api_key=api_key)
 
 # ── Embedding 模型 ────────────────────────────────────────────
 class EmbeddingGemmaEmbeddings(HuggingFaceEmbeddings):
@@ -96,7 +96,6 @@ vectorstore_souvenir = FAISS.load_local(
 # ── CoT Pipeline 函式 ─────────────────────────────────────────
 
 def user_demand_analysis(prompt):
-    client = ai.Client()
     system = """你是一位專業的旅遊行程顧問。請分析使用者的輸入，並將其需求分類為以下類別：
 1. 核心活動（如：浮潛、釣小管）
 2. 飲食偏好（如：仙人掌冰、海鮮）
@@ -104,8 +103,8 @@ def user_demand_analysis(prompt):
 4. 旅行風格（如：悠閒、冒險、家庭友善）
 5. 潛在需求（根據已知需求推測的合理配套）
 請以條列式呈現，確保不遺漏任何使用者提到的細節，且不要自行過度想像。"""
-    response = ai.Client().chat.completions.create(
-        model=f"{provider}:{model}",
+    response = _mistral_client.chat.complete(
+        model=model,
         messages=[{"role": "system", "content": system},
                   {"role": "user",   "content": prompt}]
     )
@@ -125,8 +124,8 @@ def travel_planner(prompt):
 輸出格式：
 用純文字加表情符號呈現，不使用任何 markdown 語法（不用 ##、**、--- 等）。
 行程每天條列簡短。最後加上 [NOTES] 標記，後面接注意事項與住宿建議。"""
-    response = ai.Client().chat.completions.create(
-        model=f"{provider}:{model}",
+    response = _mistral_client.chat.complete(
+        model=model,
         messages=[{"role": "system", "content": system},
                   {"role": "user",   "content": prompt}]
     )
@@ -144,8 +143,8 @@ def critical_reviewer(prompt):
 4. 環境因素：是否考慮了潮汐（若涉及摩西分海或潮間帶）與天氣風險？
 
 請條列式指出缺點並說明原因，口吻應嚴謹且專業。"""
-    response = ai.Client().chat.completions.create(
-        model=f"{provider}:{model}",
+    response = _mistral_client.chat.complete(
+        model=model,
         messages=[{"role": "system", "content": system},
                   {"role": "user",   "content": prompt}]
     )
@@ -162,8 +161,8 @@ def travel_replanner(prompt):
 4. 禁止在回覆中包含任何評論家或你的自我介紹，直接輸出最終行程。
 5. 再次確認已移除所有商業字眼與不合理的物流安排。
 用純文字加表情符號，不使用 markdown。行程結束後加上 [NOTES] 標記，後面接注意事項與住宿建議。"""
-    response = ai.Client().chat.completions.create(
-        model=f"{provider}:{model}",
+    response = _mistral_client.chat.complete(
+        model=model,
         messages=[{"role": "system", "content": system},
                   {"role": "user",   "content": prompt}]
     )
@@ -369,8 +368,8 @@ def _chat_with_penghu_rag(user_input, threshold=0.25):
 
 針對使用者的需求「{user_input}」，提供最適合的在地行程建議。"""
 
-    response = ai.Client().chat.completions.create(
-        model=f"{provider}:{model}",
+    response = _mistral_client.chat.complete(
+        model=model,
         messages=[
             {"role": "system", "content": "你是一位熱愛澎湖的在地領路人。"},
             {"role": "user",   "content": final_prompt}

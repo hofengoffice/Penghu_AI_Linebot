@@ -5,7 +5,6 @@ Flask==2.3.2
 line-bot-sdk==3.22.0
 
 # 語言模型
-aisuite
 mistralai==1.5.0
 
 # RAG 相關
