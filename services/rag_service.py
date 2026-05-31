@@ -73,24 +73,32 @@ class EmbeddingGemmaEmbeddings(HuggingFaceEmbeddings):
         return super().embed_query(f'task: search result | query: {text}')
 
 
-# ── FAISS 三庫載入（模組啟動時初始化一次）────────────────────
-embedding_model = EmbeddingGemmaEmbeddings()
+# ── FAISS 三庫（延遲載入，第一次使用智慧查詢時才初始化）──────
+_embedding_model      = None
+_vectorstore_schedule = None
+_vectorstore_scenery  = None
+_vectorstore_souvenir = None
 
-vectorstore_schedule = FAISS.load_local(
-    str(_AI_LEADER_DIR / "faiss_schedule_db"),
-    embeddings=embedding_model,
-    allow_dangerous_deserialization=True
-)
-vectorstore_scenery = FAISS.load_local(
-    str(_AI_LEADER_DIR / "faiss_scenery_db"),
-    embeddings=embedding_model,
-    allow_dangerous_deserialization=True
-)
-vectorstore_souvenir = FAISS.load_local(
-    str(_AI_LEADER_DIR / "faiss_souvenir_db"),
-    embeddings=embedding_model,
-    allow_dangerous_deserialization=True
-)
+def _get_vectorstores():
+    global _embedding_model, _vectorstore_schedule, _vectorstore_scenery, _vectorstore_souvenir
+    if _vectorstore_schedule is None:
+        _embedding_model = EmbeddingGemmaEmbeddings()
+        _vectorstore_schedule = FAISS.load_local(
+            str(_AI_LEADER_DIR / "faiss_schedule_db"),
+            embeddings=_embedding_model,
+            allow_dangerous_deserialization=True
+        )
+        _vectorstore_scenery = FAISS.load_local(
+            str(_AI_LEADER_DIR / "faiss_scenery_db"),
+            embeddings=_embedding_model,
+            allow_dangerous_deserialization=True
+        )
+        _vectorstore_souvenir = FAISS.load_local(
+            str(_AI_LEADER_DIR / "faiss_souvenir_db"),
+            embeddings=_embedding_model,
+            allow_dangerous_deserialization=True
+        )
+    return _vectorstore_schedule, _vectorstore_scenery, _vectorstore_souvenir
 
 
 # ── CoT Pipeline 函式 ─────────────────────────────────────────
@@ -293,6 +301,7 @@ def _get_weather_text(start_date, end_date):
 
 def _get_souvenir_recommendations(user_demand, top_n=2):
     try:
+        _, _, vectorstore_souvenir = _get_vectorstores()
         results = vectorstore_souvenir.similarity_search_with_relevance_scores(user_demand, k=top_n * 2)
         top_results = results[:top_n]
         if not top_results:
