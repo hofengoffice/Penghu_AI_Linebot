@@ -355,6 +355,7 @@ def _get_souvenir_recommendations(user_demand, top_n=2):
 # ── RAG 行程檢索 ──────────────────────────────────────────────
 
 def _chat_with_penghu_rag(user_input, threshold=0.25):
+    vectorstore_schedule, vectorstore_scenery, _ = _get_vectorstores()
     results_schedule = vectorstore_schedule.similarity_search_with_relevance_scores(user_input, k=50)
     results_scenery  = vectorstore_scenery.similarity_search_with_relevance_scores(user_input, k=50)
 
